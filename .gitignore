@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+.cache
+.ipynb_checkpoints
+.tox
+
+venv
+
+*.egg-info
+.eggs
