@@ -1,4 +1,4 @@
-Trickster :devil:
-=================
+Trickster
+=========
 
-Generate adversarial examples for discrete and mixed feature domains.
+Generate adversarial examples for discrete and mixed feature domains :smiling_imp:
