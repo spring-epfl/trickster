@@ -10,13 +10,22 @@ random.seed(42)
 TEST_SAMPLES = 20
 
 
-def test_oracle_shape(model_data):
+def test_featurewise_oracle_shape(model_data):
     X, Y, model = model_data
     examples = X[:TEST_SAMPLES, ]
     saliency = SaliencyOracle(model, target_class=1).eval(examples)
 
     # examples x features
     assert saliency.shape == (examples.shape[0],) + X.shape[1:]
+
+
+def test_aggregated_oracle_shape(model_data):
+    X, Y, model = model_data
+    examples = X[:TEST_SAMPLES, ]
+    saliency = SaliencyOracle(model, target_class=1) \
+            .eval(examples, featurewise=False)
+
+    assert saliency.shape == (examples.shape[0],)
 
 
 def test_saliency_complementarity(model_data):

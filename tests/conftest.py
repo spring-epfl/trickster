@@ -11,6 +11,7 @@ FIXTURE_PATH = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
         'fixtures')
 
+
 @pytest.fixture(params=['iris', 'news'])
 def model_data(request):
     name = request.param

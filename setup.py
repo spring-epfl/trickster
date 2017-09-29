@@ -12,7 +12,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name = "trickster",
-    version = "0.0.1",
+    version = "0.0.0",
     author = "Bogdan Kulynych",
     author_email = "hello@bogdankulynych.me",
     description = "Generate adversarial examples for discrete and mixed feature domains",
@@ -23,7 +23,6 @@ setup(
     install_requires=[
         "keras",
         "tensorflow",
-        "tensorflow_gpu",
     ],
     classifiers=[
         "Intended Audience :: Developers",
