@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from trickster.utils import generalized_graph_search, fast_hash
+from trickster.search import beam_a_star_search
 
 
 GRAPH_EDGES = {
@@ -20,8 +20,8 @@ DISTANCES_TO_Z = {
 }
 
 
-def generate_neighbours_fn(state, **kwargs):
-    return [(-dist, value) for dist, value in GRAPH_EDGES[state]]
+def expand_fn(state, **kwargs):
+    return [(dist, value) for dist, value in GRAPH_EDGES[state]]
 
 
 def goal_predicate(state):
@@ -29,9 +29,10 @@ def goal_predicate(state):
 
 
 def test_graph_search_dijkstra():
-    score, result = generalized_graph_search(
-        START, 10, 10,
-        generate_neighbours_fn, goal_predicate)
+    score, result = beam_a_star_search(
+        START,
+        goal_predicate,
+        expand_fn)
     assert result == FINISH
 
 
@@ -39,19 +40,20 @@ def heuristic_fn(state):
     return DISTANCES_TO_Z[state]
 
 
-def fscore_fn(parent_state, new_state, gscore, rank=1):
-    return gscore + heuristic_fn(new_state)
-
-
-def test_graph_search_astar():
-    score, result = generalized_graph_search(
-        START, 10, 10,
-        generate_neighbours_fn, goal_predicate,
-        fscore_fn)
+def test_graph_search_a_star():
+    score, result = beam_a_star_search(
+        START,
+        goal_predicate,
+        expand_fn,
+        heuristic_fn=heuristic_fn)
     assert result == FINISH
 
 
 def test_graph_search_iterations_limit():
-    output = generalized_graph_search(START, 1, 10,
-        generate_neighbours_fn, goal_predicate)
+    output = beam_a_star_search(
+        START,
+        goal_predicate,
+        expand_fn,
+        iter_lim=1)
     assert output is None
+
