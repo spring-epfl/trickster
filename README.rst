@@ -1,4 +1,10 @@
-Trickster
-=========
+.. image:: https://raw.githubusercontent.com/bogdan-kulynych/trickster/master/trickster.jpg?token=ABhOVrNH3uFQUFo5xcjptH63XUi0O1-1ks5a9bkxwA%3D%3D
+   :width: 100px
+   :alt: Trickster
 
-Generate adversarial examples for discrete and mixed feature domains :smiling_imp:
+#########
+trickster
+#########
+
+[WIP] A bunch of tools for fooling classifiers in discrete or mixed domains.
+
