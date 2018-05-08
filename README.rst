@@ -1,5 +1,5 @@
 .. image:: https://raw.githubusercontent.com/bogdan-kulynych/trickster/master/trickster.jpg?token=ABhOVrNH3uFQUFo5xcjptH63XUi0O1-1ks5a9bkxwA%3D%3D
-   :width: 100px
+   :width: 50px 
    :alt: Trickster
 
 #########
