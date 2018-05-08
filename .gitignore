@@ -3,6 +3,7 @@ __pycache__
 .cache
 .ipynb_checkpoints
 .tox
+.pytest_cache
 
 venv
 
