@@ -6,6 +6,7 @@ __pycache__
 .pytest_cache
 
 venv
+.envrc
 
 *.egg-info
 .eggs
