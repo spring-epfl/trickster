@@ -37,12 +37,12 @@ def test_optimal_search_costs(search_fn, target_node):
     start_node = 'Arad'
     goal_fn = lambda x: x == target_node
 
-    goal, path_costs, optimal_path = search_fn(
+    goal, path_costs = search_fn(
         start_node=start_node,
         heuristic_fn=heuristic_fn,
         expand_fn=expand_fn,
         goal_fn=goal_fn,
-        return_path=True
+        return_path=False
     )
 
     for node, cost in path_costs.items():
