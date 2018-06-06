@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from trickster.utils import fast_hash
+from trickster.utils.hash import fast_hash
 
 
 def test_fast_hash_deterministic():

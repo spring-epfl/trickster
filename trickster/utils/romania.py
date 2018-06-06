@@ -1,3 +1,10 @@
+"""
+"Map of Romania" path-finding problem.
+
+See "Artificial Intelligence: A Modern Approach" by Stuart J. Russel and
+Peter Norvig.
+"""
+
 HEURISTIC_MAP = {
     'Oradea': 380,
     'Zerind': 374,
@@ -74,3 +81,4 @@ OPTIMAL_COSTS_FROM_ARAD = {
     'Iasi': 737,
     'Neamt': 824
 }
+
