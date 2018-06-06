@@ -1,25 +1,26 @@
-#!/usr/bin/python
+import pytest
 
 from trickster.search import a_star_search
-from tests.test_data import *
-
-# Test A* search implementation on the Romanian City Problem
-# (Optimal path from Arad to Bucharest)
+from trickster.utils.romania import *
 
 
 def heuristic_fn(node):
     return HEURISTIC_MAP[node]
 
+
 def expand_fn(node):
     return GRAPH_TRANSITIONS[node]
 
-def test_a_star_search():
-    print('>>>> Running A* search for the Romanian City Problem.')
+
+HEURISTIC_SEARCH_FUNCS = [a_star_search]
+
+
+@pytest.mark.parametrize('search_fn', HEURISTIC_SEARCH_FUNCS)
+def test_optimal_search_path(search_fn):
     start_node = 'Arad'
     goal_fn = lambda x: x == 'Bucharest'
 
-    # Run the A* search
-    goal, path_costs, optimal_path = a_star_search(
+    goal, path_costs, optimal_path = search_fn(
         start_node=start_node,
         heuristic_fn=heuristic_fn,
         expand_fn=expand_fn,
@@ -27,14 +28,26 @@ def test_a_star_search():
         return_path=True
     )
 
-    # Test 1 - Check the returned path of the algorithm to be the optimal
     assert OPTIMAL_PATH_FROM_ARAD == optimal_path
-    print('>> (1) Returned path is optimal.')
 
-    # Test 2 - Check the costs of the optimal nodes
-    for node in optimal_path:
-        assert OPTIMAL_COSTS_FROM_ARAD[node] == path_costs[node]
-    print('>> (2) Costs of expanded nodes are optimal.')
+
+@pytest.mark.parametrize('search_fn', HEURISTIC_SEARCH_FUNCS)
+@pytest.mark.parametrize('target_node', OPTIMAL_COSTS_FROM_ARAD.keys())
+def test_optimal_search_costs(search_fn, target_node):
+    start_node = 'Arad'
+    goal_fn = lambda x: x == target_node
+
+    goal, path_costs = search_fn(
+        start_node=start_node,
+        heuristic_fn=heuristic_fn,
+        expand_fn=expand_fn,
+        goal_fn=goal_fn,
+        return_path=False
+    )
+
+    for node, cost in path_costs.items():
+        assert cost == OPTIMAL_COSTS_FROM_ARAD[node]
+
 
 if __name__ == '__main__':
     test_a_star_search()
