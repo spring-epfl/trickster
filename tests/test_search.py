@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from trickster.search import a_star
+from trickster.search import a_star_search
 from tests.test_data import *
 
 # Test A* search implementation on the Romanian City Problem
@@ -13,13 +13,13 @@ def heuristic_fn(node):
 def expand_fn(node):
     return GRAPH_TRANSITIONS[node]
 
-def test_a_star():
+def test_a_star_search():
     print('>>>> Running A* search for the Romanian City Problem.')
     start_node = 'Arad'
     goal_fn = lambda x: x == 'Bucharest'
 
     # Run the A* search
-    goal, path_costs, optimal_path = a_star(
+    goal, path_costs, optimal_path = a_star_search(
         start_node=start_node,
         heuristic_fn=heuristic_fn,
         expand_fn=expand_fn,
@@ -35,3 +35,6 @@ def test_a_star():
     for node in optimal_path:
         assert OPTIMAL_COSTS_FROM_ARAD[node] == path_costs[node]
     print('>> (2) Costs of expanded nodes are optimal.')
+
+if __name__ == '__main__':
+    test_a_star_search()

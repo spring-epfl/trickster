@@ -1,5 +1,6 @@
 from boltons.queueutils import PriorityQueue
 
+
 def _get_optimal_path(predecessors, start_node, node):
 
     # Reconstruct the optimal path from the start to the current node
@@ -14,15 +15,17 @@ def _get_optimal_path(predecessors, start_node, node):
     return path
 
 
-def a_star(start_node, expand_fn, goal_fn, heuristic_fn=None, hash_fn=None, return_path=False):
+def a_star_search(start_node, expand_fn, goal_fn,
+                  heuristic_fn=None, hash_fn=None, return_path=False):
     '''
-    Perform A* search with swappable parts. Return the target node,
-    the costs of nodes expanded by the algorithm and the optimal
-    path from the initial node to the target node.
+    A* search.
+
+    Return the target node, the costs of nodes expanded by the algorithm,
+    and the optimal path from the initial node to the target node.
 
     :param start_node: Initial node.
     :param expand_fn: Returns an iterable of tuples (neighbour, cost).
-    :param goal_fn: Returns true if the current node is the target node.
+    :param goal_fn: Returns True if the current node is the target node.
     :param heuristic_fn: Returns an estimate of the cost to the target
             node. By default, is a constant 0.
     :param hash_fn: Hash function for nodes. By default equals the
@@ -43,22 +46,23 @@ def a_star(start_node, expand_fn, goal_fn, heuristic_fn=None, hash_fn=None, retu
     open_set = PriorityQueue()
     closed_set = set()
 
-    # Add the starting node; f-score equal to heuristic
+    # Add the starting node; f-score equal to heuristic.
     path_costs[hash_fn(start_node)] = 0
     f_score = heuristic_fn(start_node)
     open_set.add(start_node, priority=-f_score)
 
-    # Iterate until goal node or open set is empty
+    # Iterate until a goal node is found or open set is empty.
     while len(open_set):
 
-        # Retrieve node with the lowest f-score
+        # Retrieve the node with the lowest f-score.
         node = open_set.pop()
         hashed_node = hash_fn(node)
 
-        # Check if current node is goal node
+        # Check if the current node is a goal node.
         if goal_fn(node):
             if return_path:
-                optimal_path = _get_optimal_path(predecessors, start_node, node)
+                optimal_path = _get_optimal_path(
+                        predecessors, start_node, node)
                 return node, path_costs, optimal_path
             return node, path_costs
         closed_set.add(hashed_node)
@@ -69,21 +73,25 @@ def a_star(start_node, expand_fn, goal_fn, heuristic_fn=None, hash_fn=None, retu
             if hashed_neighbour in closed_set:
                 continue
 
-            # Compute tentative path cost from the start node to the neighbour
+            # Compute tentative path cost from the start node to the neighbour.
             tentative_cost = path_costs[hashed_node] + cost
 
-            # Skip if the tentative path cost is larger or equal to the recorded one (if that exists)
-            if hashed_neighbour in path_costs and tentative_cost >= path_costs[hashed_neighbour]:
+            # Skip if the tentative path cost is larger or equal than the
+            # recorded one (if the latter exists).
+            if hashed_neighbour in path_costs and (
+                    tentative_cost >= path_costs[hashed_neighbour]):
                 continue
 
-            # Record new path cost for the neighbour, predecessor and add to open set
+            # Record new path cost for the neighbour, the predecessor, and add
+            # to open set.
             path_costs[hashed_neighbour] = tentative_cost
-            if return_path:
-                predecessors[hashed_neighbour] = node
             f_score = tentative_cost + heuristic_fn(neighbour)
             open_set.add(neighbour, priority=-f_score)
+            if return_path:
+                predecessors[hashed_neighbour] = node
 
-    # Goal node is unreachable
+    # Goal node is unreachable.
     if return_path:
         return None, path_costs, None
     return None, path_costs
+
