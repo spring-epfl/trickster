@@ -43,20 +43,23 @@ def a_star_search(start_node, expand_fn, goal_fn,
     # Define data structures to hold data
     path_costs = {}
     predecessors = {}
+    reverse_hashes = {}
     open_set = PriorityQueue()
     closed_set = set()
 
     # Add the starting node; f-score equal to heuristic.
-    path_costs[hash_fn(start_node)] = 0
+    hashed_start = hash_fn(start_node)
+    path_costs[hashed_start] = 0
     f_score = heuristic_fn(start_node)
-    open_set.add(start_node, priority=-f_score)
+    open_set.add(hashed_start, priority=-f_score)
+    reverse_hashes[hashed_start] = start_node
 
     # Iterate until a goal node is found or open set is empty.
     while len(open_set):
 
         # Retrieve the node with the lowest f-score.
-        node = open_set.pop()
-        hashed_node = hash_fn(node)
+        hashed_node = open_set.pop()
+        node = reverse_hashes[hashed_node]
 
         # Check if the current node is a goal node.
         if goal_fn(node):
@@ -86,7 +89,8 @@ def a_star_search(start_node, expand_fn, goal_fn,
             # to open set.
             path_costs[hashed_neighbour] = tentative_cost
             f_score = tentative_cost + heuristic_fn(neighbour)
-            open_set.add(neighbour, priority=-f_score)
+            open_set.add(hashed_neighbour, priority=-f_score)
+            reverse_hashes[hashed_neighbour] = neighbour
             if return_path:
                 predecessors[hashed_neighbour] = node
 
@@ -94,4 +98,3 @@ def a_star_search(start_node, expand_fn, goal_fn,
     if return_path:
         return None, path_costs, None
     return None, path_costs
-
