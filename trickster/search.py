@@ -1,75 +1,89 @@
-import attr
-
 from boltons.queueutils import PriorityQueue
 
-from .utils import fast_hash
+def _get_optimal_path(predecessors, start_node, node):
+
+    # Reconstruct the optimal path from the start to the current node
+    path = [node]
+
+    # Backtrack until starting node is found
+    while node != start_node:
+        node = predecessors[node]
+        path.append(node)
+    path.reverse()
+
+    return path
 
 
-def beam_a_star_search(
-        initial_node,
-        goal_predicate,
-        expand_fn,
-        heuristic_fn=None,
-        iter_lim=None,
-        beam_size=None,
-        sort_neighbours=True,
-        hash_fn=None):
+def a_star(start_node, expand_fn, goal_fn, heuristic_fn=None, hash_fn=None, return_path=False):
     '''
-    Beam A* search with swappable parts.
+    Perform A* search with swappable parts. Return the target node,
+    the costs of nodes expanded by the algorithm and the optimal
+    path from the initial node to the target node.
 
-    :param initial_node: Initial node.
-    :param expand_fn: Returns an iterable of tuples (cost, candidate).
+    :param start_node: Initial node.
+    :param expand_fn: Returns an iterable of tuples (neighbour, cost).
+    :param goal_fn: Returns true if the current node is the target node.
     :param heuristic_fn: Returns an estimate of the cost to the target
             node. By default, is a constant 0.
-    :param iter_lim: Max number of iterations to try.
-    :param beam_size: Max number of expanded candidates at each
-            iteration (beam).
-    :param hash_fn: Hash function for nodes. By default set to
-            :py:func:`utils.fash_hash`
+    :param hash_fn: Hash function for nodes. By default equals the
+            identity function f(x) = x.
+    :param return_path: Whether to return the optimal path from the
+            initial node to the target node. By default equals False.
     '''
 
+    # Define default heuristic and hash functions if none given
     if heuristic_fn is None:
         heuristic_fn = lambda _: 0
     if hash_fn is None:
-        hash_fn = lambda node: node
+        hash_fn = lambda x: x
 
-    iter_count = 0
-    closed = set()
-    pool = PriorityQueue()
+    # Define data structures to hold data
+    path_costs = {}
+    predecessors = {}
+    open_set = PriorityQueue()
+    closed_set = set()
 
-    score = heuristic_fn(initial_node)
-    cost_by_node = {}
+    # Add the starting node; f-score equal to heuristic
+    path_costs[hash_fn(start_node)] = 0
+    f_score = heuristic_fn(start_node)
+    open_set.add(start_node, priority=-f_score)
 
-    pool.add((0, initial_node), priority=-score)
-    while not len(pool) == 0 and (iter_lim is None or iter_count < iter_lim):
-        current_cost, node = pool.pop()
-        if goal_predicate(node):
-            return score, node
+    # Iterate until goal node or open set is empty
+    while len(open_set):
 
-        hashed = hash_fn(node)
-        if hashed in closed:
-            continue
-        closed.add(hashed)
+        # Retrieve node with the lowest f-score
+        node = open_set.pop()
+        hashed_node = hash_fn(node)
 
-        # Generate candidates.
-        candidates = expand_fn(node)
-        for index, (transition_cost, candidate) in enumerate(candidates):
-            if beam_size is not None and index >= beam_size:
-                break
-            if candidate in closed:
+        # Check if current node is goal node
+        if goal_fn(node):
+            if return_path:
+                optimal_path = _get_optimal_path(predecessors, start_node, node)
+                return node, path_costs, optimal_path
+            return node, path_costs
+        closed_set.add(hashed_node)
+
+        # Iterate through all neighbours of the current node
+        for neighbour, cost in expand_fn(node):
+            hashed_neighbour = hash_fn(neighbour)
+            if hashed_neighbour in closed_set:
                 continue
-            candidate_hash = hash_fn(candidate)
-            candidate_cost = current_cost + transition_cost
-            if candidate_hash in cost_by_node and (
-                    candidate_cost > cost_by_node[candidate_hash]):
+
+            # Compute tentative path cost from the start node to the neighbour
+            tentative_cost = path_costs[hashed_node] + cost
+
+            # Skip if the tentative path cost is larger or equal to the recorded one (if that exists)
+            if hashed_neighbour in path_costs and tentative_cost >= path_costs[hashed_neighbour]:
                 continue
 
-            # Compute the total score.
-            score = candidate_cost + heuristic_fn(candidate)
+            # Record new path cost for the neighbour, predecessor and add to open set
+            path_costs[hashed_neighbour] = tentative_cost
+            if return_path:
+                predecessors[hashed_neighbour] = node
+            f_score = tentative_cost + heuristic_fn(neighbour)
+            open_set.add(neighbour, priority=-f_score)
 
-            # Add to the pool and the cost dictionary.
-            pool.add((candidate_cost, candidate), priority=-score)
-            cost_by_node[candidate_hash] = candidate_cost
-
-        iter_count += 1
-
+    # Goal node is unreachable
+    if return_path:
+        return None, path_costs, None
+    return None, path_costs

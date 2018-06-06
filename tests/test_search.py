@@ -1,59 +1,37 @@
-import pytest
-import numpy as np
+#!/usr/bin/python
 
-from trickster.search import beam_a_star_search
+from trickster.search import a_star
+from tests.test_data import *
 
-
-GRAPH_EDGES = {
-    'A': [(90, 'B'), (60, 'C')],
-    'B': [(90, 'Z')],
-    'C': [(20, 'Z')],
-    'Z': [],
-}
-START = 'A'
-FINISH = 'Z'
-DISTANCES_TO_Z = {
-    'A': 150,
-    'B': 90,
-    'C': 20,
-    'Z': 0,
-}
+# Test A* search implementation on the Romanian City Problem
+# (Optimal path from Arad to Bucharest)
 
 
-def expand_fn(state, **kwargs):
-    return [(dist, value) for dist, value in GRAPH_EDGES[state]]
+def heuristic_fn(node):
+    return HEURISTIC_MAP[node]
 
+def expand_fn(node):
+    return GRAPH_TRANSITIONS[node]
 
-def goal_predicate(state):
-    return state == FINISH
+def test_a_star():
+    print('>>>> Running A* search for the Romanian City Problem.')
+    start_node = 'Arad'
+    goal_fn = lambda x: x == 'Bucharest'
 
+    # Run the A* search
+    goal, path_costs, optimal_path = a_star(
+        start_node=start_node,
+        heuristic_fn=heuristic_fn,
+        expand_fn=expand_fn,
+        goal_fn=goal_fn,
+        return_path=True
+    )
 
-def test_graph_search_dijkstra():
-    score, result = beam_a_star_search(
-        START,
-        goal_predicate,
-        expand_fn)
-    assert result == FINISH
+    # Test 1 - Check the returned path of the algorithm to be the optimal
+    assert OPTIMAL_PATH_FROM_ARAD == optimal_path
+    print('>> (1) Returned path is optimal.')
 
-
-def heuristic_fn(state):
-    return DISTANCES_TO_Z[state]
-
-
-def test_graph_search_a_star():
-    score, result = beam_a_star_search(
-        START,
-        goal_predicate,
-        expand_fn,
-        heuristic_fn=heuristic_fn)
-    assert result == FINISH
-
-
-def test_graph_search_iterations_limit():
-    output = beam_a_star_search(
-        START,
-        goal_predicate,
-        expand_fn,
-        iter_lim=1)
-    assert output is None
-
+    # Test 2 - Check the costs of the optimal nodes
+    for node in optimal_path:
+        assert OPTIMAL_COSTS_FROM_ARAD[node] == path_costs[node]
+    print('>> (2) Costs of expanded nodes are optimal.')
