@@ -20,8 +20,9 @@ def a_star_search(start_node, expand_fn, goal_fn,
     '''
     A* search.
 
-    Return the target node, the costs of nodes expanded by the algorithm,
-    and the optimal path from the initial node to the target node.
+    Returns the tuple (cost, target_node) if return_path is set to False.
+    Otherwise, returns the target node, the costs of nodes expanded by the
+    algorithm, and the optimal path from the initial node to the target node.
 
     :param start_node: Initial node.
     :param expand_fn: Returns an iterable of tuples (neighbour, cost).
@@ -67,7 +68,8 @@ def a_star_search(start_node, expand_fn, goal_fn,
                 optimal_path = _get_optimal_path(
                         predecessors, start_node, node)
                 return node, path_costs, optimal_path
-            return node, path_costs
+            else:
+                return (node, path_costs[hashed_node])
         closed_set.add(hashed_node)
 
         # Iterate through all neighbours of the current node
@@ -97,4 +99,6 @@ def a_star_search(start_node, expand_fn, goal_fn,
     # Goal node is unreachable.
     if return_path:
         return None, path_costs, None
-    return None, path_costs
+    else:
+        return None, None
+
