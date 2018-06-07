@@ -1,14 +1,14 @@
 from boltons.queueutils import PriorityQueue
 
 
-def _get_optimal_path(predecessors, start_node, node):
-
+def _get_optimal_path(predecessors, start_node, node, hash_fn):
     # Reconstruct the optimal path from the start to the current node
     path = [node]
+    hashed_start = hash_fn(start_node)
 
     # Backtrack until starting node is found
-    while node != start_node:
-        node = predecessors[node]
+    while hash_fn(node) != hashed_start:
+        node = predecessors[hash_fn(node)]
         path.append(node)
     path.reverse()
 
@@ -66,7 +66,7 @@ def a_star_search(start_node, expand_fn, goal_fn,
         if goal_fn(node):
             if return_path:
                 optimal_path = _get_optimal_path(
-                        predecessors, start_node, node)
+                        predecessors, start_node, node, hash_fn)
                 return node, path_costs, optimal_path
             else:
                 return (node, path_costs[hashed_node])
