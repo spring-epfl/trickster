@@ -1,6 +1,6 @@
 import pytest
 
-from trickster.search import a_star_search
+from trickster.search import a_star_search, ida_star_search
 from trickster.utils.romania import *
 
 
@@ -12,7 +12,7 @@ def expand_fn(node):
     return GRAPH_TRANSITIONS[node]
 
 
-HEURISTIC_SEARCH_FUNCS = [a_star_search]
+HEURISTIC_SEARCH_FUNCS = [a_star_search, ida_star_search]
 
 
 @pytest.mark.parametrize('search_fn', HEURISTIC_SEARCH_FUNCS)
@@ -66,5 +66,3 @@ def test_optimal_search_costs(search_fn, target_node):
     for node, cost in path_costs.items():
         if node in optimal_path:
             assert cost == OPTIMAL_COSTS_FROM_ARAD[node]
-
-

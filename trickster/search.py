@@ -102,3 +102,126 @@ def a_star_search(start_node, expand_fn, goal_fn,
     else:
         return None, None
 
+
+def _bounded_search(path, path_costs, bound, expand_fn,
+                goal_fn, heuristic_fn, hash_fn, reverse_hashes):
+
+    # Expand the last node on the search path.
+    hashed_node = path[-1]
+    node = reverse_hashes[hashed_node]
+    f_score = path_costs[hashed_node] + heuristic_fn(node)
+
+    # Backtrack if f-score exceeds the bound.
+    if f_score > bound:
+        return False, f_score, node, path
+    if goal_fn(node):
+        return True, f_score, node, path
+
+    min_score = None
+
+    # Iterate through all neighbours of the current node.
+    for neighbour, cost in expand_fn(node):
+        hashed_neighbour = hash_fn(neighbour)
+
+        # Expand the neighbour only if it was not already visited.
+        if hashed_neighbour not in path:
+            path.append(hashed_neighbour)
+            reverse_hashes[hashed_neighbour] = neighbour
+            path_costs[hashed_neighbour] = path_costs[hashed_node] + cost
+
+            # Call the search recursively on the neighbour with new path and costs.
+            is_found, score, candidate_node, candidate_path = _bounded_search(
+                list(path),
+                path_costs,
+                bound,
+                expand_fn,
+                goal_fn,
+                heuristic_fn,
+                hash_fn,
+                reverse_hashes
+            )
+
+            if is_found:
+                return True, score, candidate_node, candidate_path
+
+            # If score is None then leave min_score None,
+            # otherwise update if score is smaller.
+            if min_score is None or score is None or score < min_score:
+                min_score = score
+
+            # Remove the neighbour from the path.
+            path.pop()
+
+    return False, min_score, None, None
+
+
+'''
+TODO:   IDA_star_search passes unit tests, but currently gets stuck in a loop
+        when generating adversarial examples on credit dataset
+'''
+
+def ida_star_search(start_node, expand_fn, goal_fn,
+                  heuristic_fn=None, hash_fn=None, return_path=False):
+    '''
+    IDA* search.
+
+    Returns the tuple (cost, target_node) if return_path is set to False.
+    Otherwise, returns the target node, the costs of nodes expanded by the
+    algorithm, and the optimal path from the initial node to the target node.
+
+    :param start_node: Initial node.
+    :param expand_fn: Returns an iterable of tuples (neighbour, cost).
+    :param goal_fn: Returns True if the current node is the target node.
+    :param heuristic_fn: Returns an estimate of the cost to the target
+            node. By default, is a constant 0.
+    :param hash_fn: Hash function for nodes. By default equals the
+            identity function f(x) = x.
+    :param return_path: Whether to return the optimal path from the
+            initial node to the target node. By default equals False.
+    '''
+
+    # Define default heuristic and hash functions if none given.
+    if heuristic_fn is None:
+        heuristic_fn = lambda _: 0
+    if hash_fn is None:
+        hash_fn = lambda x: x
+
+    # Define data structures to hold data.
+    path_costs = {}
+    reverse_hashes = {}
+
+    # Add the starting node; bound equal to heuristic.
+    hashed_start = hash_fn(start_node)
+    path_costs[hashed_start] = 0
+    bound = heuristic_fn(start_node)
+    path = [hashed_start]
+    reverse_hashes[hashed_start] = start_node
+
+
+    # Iterate until found or score is None (i.e. no children).
+    while True:
+        is_found, score, candidate_node, candidate_path = _bounded_search(
+            list(path),
+            path_costs,
+            bound,
+            expand_fn,
+            goal_fn,
+            heuristic_fn,
+            hash_fn,
+            reverse_hashes
+        )
+        if is_found:
+            if return_path:
+                return candidate_node, path_costs, candidate_path
+            else:
+                return candidate_node, score
+            
+        # Goal node is unreachable.
+        if score is None:
+            if return_path:
+                return None, path_costs, None
+            else:
+                return None, None
+
+        # Set the bound to be equal to the lowest f-score encountered.
+        bound = score
