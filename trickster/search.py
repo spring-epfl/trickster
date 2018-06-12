@@ -103,8 +103,8 @@ def a_star_search(start_node, expand_fn, goal_fn,
         return None, None
 
 
-def _bounded_search(path, path_costs, bound, expand_fn,
-                goal_fn, heuristic_fn, hash_fn, reverse_hashes):
+def _bounded_search_recusive(path, path_costs, bound, expand_fn,
+                             goal_fn, heuristic_fn, hash_fn, reverse_hashes):
 
     # Expand the last node on the search path.
     hashed_node = path[-1]
@@ -130,8 +130,8 @@ def _bounded_search(path, path_costs, bound, expand_fn,
             path_costs[hashed_neighbour] = path_costs[hashed_node] + cost
 
             # Call the search recursively on the neighbour with new path and costs.
-            is_found, score, candidate_node, candidate_path = _bounded_search(
-                list(path),
+            is_found, score, candidate_node, candidate_path = _bounded_search_recusive(
+                path,
                 path_costs,
                 bound,
                 expand_fn,
@@ -156,12 +156,60 @@ def _bounded_search(path, path_costs, bound, expand_fn,
 
 
 '''
-TODO:   IDA_star_search passes unit tests, but currently gets stuck in a loop
-        when generating adversarial examples on credit dataset
+TODO:   Currently does not support "return_path=True",
+        as path costs are not recorded.
 '''
+def _bounded_search(path, path_costs, bound, expand_fn,
+                    goal_fn, heuristic_fn, hash_fn, reverse_hashes):
+
+    # Obtain the starting node and its cost.
+    hashed_node = path[-1]
+    path_cost = path_costs[hashed_node]
+
+    # Reset the path.
+    path = []
+
+    # Initialise stack to imitate recursive calls.
+    # Stack holds tuples (current node, cost to current node and predecessor).
+    stack = [(hashed_node, path_cost, None)]
+    min_score = None
+
+    # Iterate while stack is not empty.
+    while len(stack):
+
+        hashed_node, path_cost, predecessor = stack.pop()
+
+        # Backtracks if the last node on the path was already expanded.
+        if predecessor and predecessor != path[-1]:
+            path.pop()
+
+        path.append(hashed_node)
+        node = reverse_hashes[hashed_node]
+        f_score = path_cost + heuristic_fn(node)
+
+        # Backtrack if f-score exceeds the bound.
+        if f_score > bound:
+            path.pop()
+            if min_score is None or f_score < min_score:
+                min_score = f_score
+            continue
+        if goal_fn(node):
+            return True, f_score, node, path
+
+        # Iterate through all neighbours of the current node.
+        for neighbour, cost in reversed(expand_fn(node)):
+            hashed_neighbour = hash_fn(neighbour)
+
+            # Expand the neighbour only if it was not already visited.
+            if hashed_neighbour not in path:
+                reverse_hashes[hashed_neighbour] = neighbour
+                stack.append((hashed_neighbour, path_cost + cost, hashed_node))
+
+    return False, min_score, None, None
+
 
 def ida_star_search(start_node, expand_fn, goal_fn,
-                  heuristic_fn=None, hash_fn=None, return_path=False):
+                    heuristic_fn=None, hash_fn=None, return_path=False):
     '''
     IDA* search.
 
@@ -197,11 +245,10 @@ def ida_star_search(start_node, expand_fn, goal_fn,
     path = [hashed_start]
     reverse_hashes[hashed_start] = start_node
 
-
     # Iterate until found or score is None (i.e. no children).
     while True:
-        is_found, score, candidate_node, candidate_path = _bounded_search(
-            list(path),
+        is_found, score, candidate_node, candidate_path = _bounded_search_recusive(
+            path,
             path_costs,
             bound,
             expand_fn,
@@ -212,10 +259,11 @@ def ida_star_search(start_node, expand_fn, goal_fn,
         )
         if is_found:
             if return_path:
-                return candidate_node, path_costs, candidate_path
+                optimal_path = [reverse_hashes[x] for x in candidate_path]
+                return candidate_node, path_costs, optimal_path
             else:
                 return candidate_node, score
-            
+
         # Goal node is unreachable.
         if score is None:
             if return_path:
