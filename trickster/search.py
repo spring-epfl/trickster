@@ -130,7 +130,7 @@ def _bounded_search_recusive(path, path_costs, bound, expand_fn,
             path_costs[hashed_neighbour] = path_costs[hashed_node] + cost
 
             # Call the search recursively on the neighbour with new path and costs.
-            is_found, score, candidate_node, candidate_path = _bounded_search_recusive(
+            output = _bounded_search_recusive(
                 path,
                 path_costs,
                 bound,
@@ -140,6 +140,8 @@ def _bounded_search_recusive(path, path_costs, bound, expand_fn,
                 hash_fn,
                 reverse_hashes
             )
+
+            is_found, score, candidate_node, candidate_path = output
 
             if is_found:
                 return True, score, candidate_node, candidate_path
@@ -155,10 +157,6 @@ def _bounded_search_recusive(path, path_costs, bound, expand_fn,
     return False, min_score, None, None
 
 
-'''
-TODO:   Currently does not support "return_path=True",
-        as path costs are not recorded.
-'''
 def _bounded_search(path, path_costs, bound, expand_fn,
                     goal_fn, heuristic_fn, hash_fn, reverse_hashes):
 
@@ -180,11 +178,12 @@ def _bounded_search(path, path_costs, bound, expand_fn,
         hashed_node, path_cost, predecessor = stack.pop()
 
         # Backtracks if the last node on the path was already expanded.
-        if predecessor and predecessor != path[-1]:
+        while predecessor and predecessor != path[-1]:
             path.pop()
 
         path.append(hashed_node)
         node = reverse_hashes[hashed_node]
+        path_costs[hashed_node] = path_cost
         f_score = path_cost + heuristic_fn(node)
 
         # Backtrack if f-score exceeds the bound.
@@ -247,7 +246,7 @@ def ida_star_search(start_node, expand_fn, goal_fn,
 
     # Iterate until found or score is None (i.e. no children).
     while True:
-        is_found, score, candidate_node, candidate_path = _bounded_search_recusive(
+        output = _bounded_search(
             path,
             path_costs,
             bound,
@@ -257,6 +256,9 @@ def ida_star_search(start_node, expand_fn, goal_fn,
             hash_fn,
             reverse_hashes
         )
+
+        is_found, score, candidate_node, candidate_path = output
+
         if is_found:
             if return_path:
                 optimal_path = [reverse_hashes[x] for x in candidate_path]
