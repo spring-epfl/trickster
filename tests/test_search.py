@@ -13,10 +13,12 @@ def expand_fn(node):
 
 
 HEURISTIC_SEARCH_FUNCS = [a_star_search, ida_star_search]
+HASH_FUNCS = [None, hash]
 
 
 @pytest.mark.parametrize('search_fn', HEURISTIC_SEARCH_FUNCS)
-def test_optimal_search_path(search_fn):
+@pytest.mark.parametrize('hash_fn', HASH_FUNCS)
+def test_optimal_search_path(search_fn, hash_fn):
     start_node = 'Arad'
     goal_fn = lambda x: x == 'Bucharest'
 
@@ -25,6 +27,7 @@ def test_optimal_search_path(search_fn):
         heuristic_fn=heuristic_fn,
         expand_fn=expand_fn,
         goal_fn=goal_fn,
+        hash_fn=hash_fn,
         return_path=True
     )
 
@@ -33,7 +36,8 @@ def test_optimal_search_path(search_fn):
 
 @pytest.mark.parametrize('search_fn', HEURISTIC_SEARCH_FUNCS)
 @pytest.mark.parametrize('target_node', OPTIMAL_COSTS_FROM_ARAD.keys())
-def test_optimal_search_target_node(search_fn, target_node):
+@pytest.mark.parametrize('hash_fn', HASH_FUNCS)
+def test_optimal_search_target_node(search_fn, target_node, hash_fn):
     start_node = 'Arad'
     goal_fn = lambda x: x == target_node
 
@@ -42,6 +46,7 @@ def test_optimal_search_target_node(search_fn, target_node):
         start_node=start_node,
         expand_fn=expand_fn,
         goal_fn=goal_fn,
+        hash_fn=hash_fn,
         return_path=False
     )
 
@@ -51,7 +56,8 @@ def test_optimal_search_target_node(search_fn, target_node):
 
 @pytest.mark.parametrize('search_fn', HEURISTIC_SEARCH_FUNCS)
 @pytest.mark.parametrize('target_node', OPTIMAL_COSTS_FROM_ARAD.keys())
-def test_optimal_search_costs(search_fn, target_node):
+@pytest.mark.parametrize('hash_fn', HASH_FUNCS)
+def test_optimal_search_costs(search_fn, target_node, hash_fn):
     start_node = 'Arad'
     goal_fn = lambda x: x == target_node
 
@@ -60,6 +66,7 @@ def test_optimal_search_costs(search_fn, target_node):
         start_node=start_node,
         expand_fn=expand_fn,
         goal_fn=goal_fn,
+        hash_fn=hash_fn,
         return_path=True
     )
 
