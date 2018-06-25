@@ -15,8 +15,15 @@ def _get_optimal_path(predecessors, start_node, node, hash_fn):
     return path
 
 
-def a_star_search(start_node, expand_fn, goal_fn,
-                  heuristic_fn=None, hash_fn=None, return_path=False):
+def a_star_search(
+        start_node, 
+        expand_fn, 
+        goal_fn,
+        heuristic_fn=None, 
+        hash_fn=None,
+        iter_lim=None,
+        return_path=False
+    ):
     '''
     A* search.
 
@@ -31,6 +38,7 @@ def a_star_search(start_node, expand_fn, goal_fn,
             node. By default, is a constant 0.
     :param hash_fn: Hash function for nodes. By default equals the
             identity function f(x) = x.
+    :param iter_lim: Maximum number of iterations to try.
     :param return_path: Whether to return the optimal path from the
             initial node to the target node. By default equals False.
     '''
@@ -40,6 +48,8 @@ def a_star_search(start_node, expand_fn, goal_fn,
         heuristic_fn = lambda _: 0
     if hash_fn is None:
         hash_fn = lambda x: x
+       
+    iter_count = 0
 
     # Define data structures to hold data
     path_costs = {}
@@ -55,8 +65,9 @@ def a_star_search(start_node, expand_fn, goal_fn,
     open_set.add(hashed_start, priority=-f_score)
     reverse_hashes[hashed_start] = start_node
 
-    # Iterate until a goal node is found or open set is empty.
-    while len(open_set):
+    # Iterate until a goal node is found, open set is empty
+    # or max number of iterations has been reached.
+    while len(open_set) and (iter_lim is None or iter_count < iter_lim):
 
         # Retrieve the node with the lowest f-score.
         hashed_node = open_set.pop()
@@ -95,6 +106,8 @@ def a_star_search(start_node, expand_fn, goal_fn,
             reverse_hashes[hashed_neighbour] = neighbour
             if return_path:
                 predecessors[hashed_neighbour] = node
+                
+        iter_count += 1
 
     # Goal node is unreachable.
     if return_path:
@@ -207,8 +220,14 @@ def _bounded_search(path, path_costs, bound, expand_fn,
     return False, min_score, None, None
 
 
-def ida_star_search(start_node, expand_fn, goal_fn,
-                    heuristic_fn=None, hash_fn=None, return_path=False):
+def ida_star_search(
+        start_node, 
+        expand_fn, 
+        goal_fn,
+        heuristic_fn=None, 
+        hash_fn=None, 
+        return_path=False
+    ):
     '''
     IDA* search.
 
