@@ -1,4 +1,6 @@
 import sys
+import numpy as np
+from sklearn.preprocessing import OneHotEncoder
 
 # Extract CUMUL features
 def extract(sinste):
@@ -120,3 +122,28 @@ def load_cell(fname, time=0, ext=".cell"):
         print("Could not load", fname)
         sys.exit(-1)
     return data
+
+def one_hot_to_indices(data):
+    indices = []
+    for el in data:
+        indices.append(list(el).index(1))
+    return indices
+
+def pad_and_onehot(data):
+    max_trace_len = len(max([x for x in data], key=len)) + 200
+    data = [np.pad(x, (0,max_trace_len-len(x)), 'constant') for x in data]
+    data = onehot(data)
+    return max_trace_len, np.array(data)
+
+def onehot(data):
+    data_ = []
+    for d in data:
+        b = np.zeros((len(d), 3))
+        b[np.arange(len(d)), d] = 1
+        data_.append(b.flatten())
+    return data_
+
+def reverse_onehot(arr, trace_len):
+    f = np.argmax(np.reshape(arr, (trace_len, 3)), axis=1)
+    f[f == 2] = -1
+    return f
