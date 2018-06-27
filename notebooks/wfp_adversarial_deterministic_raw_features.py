@@ -80,10 +80,9 @@ class Counter:
 # level i+1 with a new request at every possible index.
 
 class BruteNode:
-    
     def __init__(self, x):
         self.root = list(reverse_onehot(x, trace_len))
-    
+
     def expand(self):
         # Increment the counter of expanded nodes.
         counter = Counter.get_default()
@@ -93,9 +92,9 @@ class BruteNode:
         for idx in range(len(self.root) + 1):
             expanded_node = self.root[:idx] + [1] + self.root[idx:]
             children.append(np.array(expanded_node)[:trace_len])
-        
+
         return onehot(children)
-    
+
     def __repr__(self):
         return 'BruteNode({})'.format(self.root)
 
@@ -107,8 +106,8 @@ def _expand_fn(x, p_norm=1):
     Returns a list of tuples (child, cost)
     """
     children = BruteNode(x).expand()
-    costs = [np.linalg.norm(
-        np.array(reverse_onehot(c, trace_len)), ord=p_norm) - np.linalg.norm(np.abs(np.array(reverse_onehot(x, trace_len))), ord=p_norm)
+    # Use Lp distance in the feature space.
+    costs = [np.linalg.norm(np.array(x) - np.array(c), ord=p_norm)
              for c in children]
 
     # Poor man's logging.
@@ -145,7 +144,7 @@ def _heuristic_fn(x, clf, q_norm=np.inf, eps=1., offset=0):
 
 def hash_fn(x):
     """Hash function for examples."""
-    x_str = str(x.root)
+    x_str = str(x)
     return hash(x_str)
 
 @profiled
@@ -155,18 +154,19 @@ def find_adversarial(x, clf, p_norm=1, q_norm=np.inf,
     """Transform an example until it is classified with target confidence."""
 
     if clf.predict_proba([x])[0, 1] >= target_confidence:
-        raise Exception('Initial example is already classified as positive.')        
+        raise Exception('Initial example is already classified as positive.')
     return a_star_search(
-        start_node=x, 
-        expand_fn=lambda x: _expand_fn(x, p_norm=p_norm), 
-        goal_fn=lambda x: _goal_fn(x, clf, target_confidence), 
-        heuristic_fn=lambda x: _heuristic_fn(x, clf, q_norm=q_norm), 
+        start_node=x,
+        expand_fn=lambda x: _expand_fn(x, p_norm=p_norm),
+        goal_fn=lambda x: _goal_fn(x, clf, target_confidence),
+        heuristic_fn=lambda x: _heuristic_fn(x, clf, q_norm=q_norm),
         iter_lim=int(1e1),
         hash_fn=hash_fn,
         return_path=return_path
     )
 
-def find_adv_examples(X, target_confidence, p_norm=1, q_norm=np.inf):
+def find_adv_examples(X, target_confidence, out_path,
+                      p_norm=1, q_norm=np.inf, eps=1.0):
     """Find adversarial examples for a whole dataset"""
 
     # Dataframe for storing the results.
@@ -176,35 +176,37 @@ def find_adv_examples(X, target_confidence, p_norm=1, q_norm=np.inf):
 
     # Indices of examples classified as negative.
     neg_indices, = np.where(clf.predict_proba(X)[:, 1] < target_confidence)
-    
-    for i, original_index in enumerate(neg_indices):
+
+    for i, original_index in enumerate(tqdm(neg_indices)):
         x = X[original_index]
-        
+
         # Instantiate a counter for expanded nodes, and a profiler.
         expanded_counter = Counter()
         per_example_profiler = Profiler()
 
         with expanded_counter.as_default(), per_example_profiler.as_default():
             x_adv, path_cost = find_adversarial(
-                    x, clf, target_confidence=target_confidence, eps=eps, offset=offset)
+                    x, clf, target_confidence=target_confidence, eps=eps)
 
         nodes_expanded = expanded_counter.count()
         runtime = per_example_profiler.compute_stats()['find_adversarial']['tot']
+        original_confidence = clf.predict_proba([x])[0, 1]
 
         # If an adversarial example was not found, only record index, runtime, and
         # the number of expanded nodes.
         if x_adv is None:
-            results.loc[i] = [original_index, False, [], None,
+            results.loc[i] = [original_index, False, None, original_confidence, x, None,
                               None, None, nodes_expanded, runtime, target_confidence]
         else:
             confidence = clf.predict_proba([x_adv])[0, 1]
-            original_confidence = clf.predict_proba([x])[0, 1]
             real_cost = np.linalg.norm(x_adv, ord=p_norm) - np.linalg.norm(x, ord=p_norm)
-            
-            results.loc[i] = [original_index, True, confidence, original_confidence,
+
+            results.loc[i] = [original_index, True, confidence, original_confidence, x, x_adv,
                               real_cost, path_cost, nodes_expanded, runtime, target_confidence]
             print(results.loc[i])
 
+            with open(out_path, 'wb') as f:
+                pickle.dump(results_graph, f)
     return results
 
 
@@ -216,14 +218,13 @@ def main():
                         help='number of examples')
     parser.add_argument('--epsilon', type=int, default=1., metavar='N',
                         help='greediness parameter')
-    parser.add_argument('--offset', type=int, default=1., metavar='N',
-                        help='heuristic offset')
     args = parser.parse_args()
 
-    results_graph = find_adv_examples(X, args.confidence_level)
+    out_path = './data/wfp_raw_det_conf_l_%.2f_eps_%.2f.pkl' % (
+            args.confidence_level, args.epsilon)
+    results_graph = find_adv_examples(X, args.confidence_level, out_path,
+            eps=args.epsilon)
 
-    with open('./data/wfp_det_conf_l_%.2f.pkl' %(args.confidence_level), 'wb') as f:
-        pickle.dump(results_graph, f)
 
 if __name__ == "__main__":
     main()
