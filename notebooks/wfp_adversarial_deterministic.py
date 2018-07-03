@@ -187,7 +187,7 @@ def find_adversarial(x, clf, p_norm=1, q_norm=np.inf,
         return_path=return_path
     )
 
-def find_adv_examples(X_cells, X_features, target_confidence,
+def find_adv_examples(X_cells, X_features, target_confidence, output_path,
                       p_norm=1, q_norm=np.inf, eps=100., offset=0.):
     """Find adversarial examples for a whole dataset"""
 
@@ -199,7 +199,7 @@ def find_adv_examples(X_cells, X_features, target_confidence,
     # Indices of examples classified as negative.
     neg_indices, = np.where(clf.predict_proba(X_features)[:, 1] < target_confidence)
 
-    for i, original_index in enumerate(neg_indices):
+    for i, original_index in enumerate(tqdm(neg_indices)):
         x = X_cells[original_index]
 
         # Instantiate a counter for expanded nodes, and a profiler.
@@ -208,24 +208,27 @@ def find_adv_examples(X_cells, X_features, target_confidence,
 
         with expanded_counter.as_default(), per_example_profiler.as_default():
             x_adv, path_cost = find_adversarial(
-                    x, clf, target_confidence=target_confidence, eps=eps, offset=offset)
+                    x, clf, target_confidence=target_confidence,
+                    p_norm=p_norm, q_norm=q_norm, eps=eps, offset=offset)
 
         nodes_expanded = expanded_counter.count()
         runtime = per_example_profiler.compute_stats()['find_adversarial']['tot']
+        original_confidence = clf.predict_proba([extract(x)])[0, 1]
 
-        # If an adversarial example was not found, only record index, runtime, and
-        # the number of expanded nodes.
         if x_adv is None:
-            results.loc[i] = [original_index, False, [], None,
-                              None, None, nodes_expanded, runtime]
+            # If an adversarial example was not found, only record index, runtime, and
+            # the number of expanded nodes.
+            results.loc[i] = [original_index, False, None, original_confidence, x, None,
+                              None, None, nodes_expanded, runtime, target_confidence]
         else:
             confidence = clf.predict_proba([x_adv.features])[0, 1]
-            original_confidence = clf.predict_proba([extract(x)])[0, 1]
-            real_cost = np.linalg.norm(x_adv.root, ord=p_norm) - np.linalg.norm(x, ord=p_norm)
+            real_cost = len(x_adv.root) - len(x)
 
             results.loc[i] = [original_index, True, confidence, original_confidence, x, x_adv.root,
                               real_cost, path_cost, nodes_expanded, runtime, target_confidence]
             print(results.loc[i])
+            with open(output_path, 'wb') as f:
+                pickle.dump(results, f)
 
     return results
 
@@ -241,16 +244,18 @@ def main():
     parser.add_argument('--offset', type=int, default=1., metavar='N',
                         help='heuristic offset')
     args = parser.parse_args()
+    output_path = 'wfp_det_eps_%1.1f_conf_l_%1.1f.pkl' % (args.epsilon, args.confidence_level)
 
-    results_graph = find_adv_examples(
+    results = find_adv_examples(
             X_test_cell[:args.num_examples],
             X_test_features[:args.num_examples],
             args.confidence_level,
+            p_norm=np.inf,
+            q_norm=1,
             eps=args.epsilon,
-            offset=args.offset)
-
-    with open('./data/wfp_det_conf_l_%.2f.pkl' %(args.confidence_level), 'wb') as f:
-        pickle.dump(results_graph, f)
+            offset=args.offset,
+            output_path=output_path)
 
 if __name__ == "__main__":
     main()
+
