@@ -1,57 +1,207 @@
 import pytest
+import numpy as np
 
 from trickster.expansion import *
 from trickster.utils.expansion import *
 
-@pytest.mark.parametrize("a, feat_idxs, expected", TEST_DATA_EXPAND_QUANTIZED_INCREMENT)
+A = np.array([0, 0, 0, 1, 0, 0, 0])
+
+FEAT_IDXS = [
+    [3],
+    [2, 3, 4],
+    [1, 2, 3, 4, 5],
+    [0, 1, 2, 3, 4, 5, 6]
+]
+
+
+@pytest.mark.parametrize("a, feat_idxs, expected", [
+    (A, FEAT_IDXS[0], []),
+    (A, FEAT_IDXS[1], [[0, 0, 0, 0, 1, 0, 0]]),
+    (A, FEAT_IDXS[2], [[0, 0, 0, 0, 1, 0, 0]]),
+    (A, FEAT_IDXS[3], [[0, 0, 0, 0, 1, 0, 0]])
+])
 def test_expand_quantized_increment(a, feat_idxs, expected):
-
     children = expand_quantized_increment(a, feat_idxs)
-    assert children == expected
-
-@pytest.mark.parametrize("a, feat_idxs, expected", TEST_DATA_EXPAND_QUANTIZED_DECREMENT)
-def test_expand_quantized_decrement(a, feat_idxs, expected):
-
-    children = expand_quantized_decrement(a, feat_idxs)
-    assert children == expected
-
-@pytest.mark.parametrize("a, feat_idxs, expected", TEST_DATA_EXPAND_QUANTIZED)
-def test_expand_quantized(a, feat_idxs, expected):
-
-    children = expand_quantized(a, feat_idxs)
-    assert children == expected
-
-@pytest.mark.parametrize("a, feat_idxs, expected", TEST_DATA_EXPAND_CATEGORICAL)
-def test_expand_categorical(a, feat_idxs, expected):
-
-    children = expand_categorical(a, feat_idxs)
-    assert children == expected
-
-@pytest.mark.parametrize("a, feat_idxs, expected", TEST_DATA_EXPAND_COLLECTION_SET)
-def test_expand_collection_set(a, feat_idxs, expected):
-
-    children = expand_collection_set(a, feat_idxs)
-    assert children == expected
-
-@pytest.mark.parametrize("a, feat_idxs, expected", TEST_DATA_EXPAND_COLLECTION_RESET)
-def test_expand_collection_reset(a, feat_idxs, expected):
-
-    children = expand_collection_reset(a, feat_idxs)
-    assert children == expected
-
-@pytest.mark.parametrize("a, feat_idxs, expected", TEST_DATA_EXPAND_COLLECTION)
-def test_expand_collection(a, feat_idxs, expected):
-
-    children = expand_collection(a, feat_idxs)
-    assert children == expected
-
-@pytest.mark.parametrize("a, feat_idxs, expected", TEST_DATA_EXPAND)
-def test_expand(a, feat_idxs, expected):
+    assert np.array_equal(np.array(children), np.array(expected))
     
+    
+@pytest.mark.parametrize("a, feat_idxs, expected", [
+    (A, FEAT_IDXS[0], []),
+    (A, FEAT_IDXS[1], [[0, 0, 1, 0, 0, 0, 0]]),
+    (A, FEAT_IDXS[2], [[0, 0, 1, 0, 0, 0, 0]]),
+    (A, FEAT_IDXS[3], [[0, 0, 1, 0, 0, 0, 0]])
+])
+def test_expand_quantized_decrement(a, feat_idxs, expected):
+    children = expand_quantized_decrement(a, feat_idxs)
+    assert np.array_equal(np.array(children), np.array(expected))
+    
+    
+@pytest.mark.parametrize("a, feat_idxs, expected", [
+    (A, FEAT_IDXS[0], []),
+    (A, FEAT_IDXS[1], [
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[2], [
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[3], [
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0]
+    ])
+])
+def test_expand_quantized(a, feat_idxs, expected):
+    children = expand_quantized(a, feat_idxs)
+    assert np.array_equal(np.array(children), np.array(expected))
+    
+    
+@pytest.mark.parametrize("a, feat_idxs, expected", [
+    (A, FEAT_IDXS[0], []),
+    (A, FEAT_IDXS[1], [
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[2], [
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0],
+        [0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[3], [
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 1],
+        [1, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0]
+    ])
+])
+def test_expand_categorical(a, feat_idxs, expected):
+    children = expand_categorical(a, feat_idxs)
+    assert np.array_equal(np.array(children), np.array(expected))
+   
+
+@pytest.mark.parametrize("a, feat_idxs, expected", [
+    (A, FEAT_IDXS[0], []),
+    (A, FEAT_IDXS[1], [
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0]
+    ]),
+    (A, FEAT_IDXS[2], [
+        [0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 1, 0, 1, 0]
+    ]),
+    (A, FEAT_IDXS[3], [
+        [1, 0, 0, 1, 0, 0, 0],
+        [0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 1, 0, 1, 0],
+        [0, 0, 0, 1, 0, 0, 1]
+    ])
+])
+def test_expand_collection_set(a, feat_idxs, expected):
+    children = expand_collection_set(a, feat_idxs)
+    assert np.array_equal(np.array(children), np.array(expected))
+   
+
+@pytest.mark.parametrize("a, feat_idxs, expected", [
+    (A, FEAT_IDXS[0], [
+        [0, 0, 0, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[1], [
+        [0, 0, 0, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[2], [
+        [0, 0, 0, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[3], [
+        [0, 0, 0, 0, 0, 0, 0]
+    ])
+])
+def test_expand_collection_reset(a, feat_idxs, expected):
+    children = expand_collection_reset(a, feat_idxs)
+    assert np.array_equal(np.array(children), np.array(expected))
+    
+    
+@pytest.mark.parametrize("a, feat_idxs, expected", [
+    (A, FEAT_IDXS[0], [
+        [0, 0, 0, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[1], [
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[2], [
+        [0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 1, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[3], [
+        [1, 0, 0, 1, 0, 0, 0],
+        [0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 1, 0, 1, 0],
+        [0, 0, 0, 1, 0, 0, 1],
+        [0, 0, 0, 0, 0, 0, 0]
+    ])
+]
+)
+def test_expand_collection(a, feat_idxs, expected):
+    children = expand_collection(a, feat_idxs)
+    assert np.array_equal(np.array(children), np.array(expected))
+      
+        
+@pytest.mark.parametrize("a, feat_idxs, expected", [
+    (A, FEAT_IDXS[0], [
+        [0, 0, 0, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[1], [
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[2], [
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0],
+        [0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0],
+        [0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 1, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0]
+    ]),
+    (A, FEAT_IDXS[3], [
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 1],
+        [1, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0],
+        [1, 0, 0, 1, 0, 0, 0],
+        [0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 1, 0, 1, 0],
+        [0, 0, 0, 1, 0, 0, 1],
+        [0, 0, 0, 0, 0, 0, 0]
+    ])
+])
+def test_expand(a, feat_idxs, expected):
     expansions = [
         (feat_idxs, expand_categorical),
         (feat_idxs, expand_collection)
     ]
     
     children = expand(a, expansions)
-    assert children == expected
+    assert np.array_equal(np.array(children), np.array(expected))
