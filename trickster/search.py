@@ -66,7 +66,7 @@ def a_star_search(
     reverse_hashes[hashed_start] = start_node
 
     # Iterate until a goal node is found, open set is empty
-    # or max number of iterations has been reached.
+    # or iteration limit has been reached.
     while len(open_set) and (iter_lim is None or iter_count < iter_lim):
 
         # Retrieve the node with the lowest f-score.
@@ -186,7 +186,7 @@ def _bounded_search(path, path_costs, bound, expand_fn,
     min_score = None
 
     # Iterate while stack is not empty.
-    while len(stack):
+    while len(stack): 
 
         hashed_node, path_cost, predecessor = stack.pop()
 
@@ -226,6 +226,7 @@ def ida_star_search(
         goal_fn,
         heuristic_fn=None, 
         hash_fn=None, 
+        iter_lim=None,
         return_path=False
     ):
     '''
@@ -242,6 +243,8 @@ def ida_star_search(
             node. By default, is a constant 0.
     :param hash_fn: Hash function for nodes. By default equals the
             identity function f(x) = x.
+    :param iter_lim: Maximum number of iterations to try.
+
     :param return_path: Whether to return the optimal path from the
             initial node to the target node. By default equals False.
     '''
@@ -252,6 +255,8 @@ def ida_star_search(
     if hash_fn is None:
         hash_fn = lambda x: x
 
+    iter_count = 0
+    
     # Define data structures to hold data.
     path_costs = {}
     reverse_hashes = {}
@@ -263,8 +268,10 @@ def ida_star_search(
     path = [hashed_start]
     reverse_hashes[hashed_start] = start_node
 
-    # Iterate until found or score is None (i.e. no children).
-    while True:
+    # Iterate until found, score is None (i.e. no children)
+    # or iteration limit has been reached.
+    while iter_lim is None or iter_count < iter_lim:
+
         output = _bounded_search(
             path,
             path_costs,
@@ -294,3 +301,4 @@ def ida_star_search(
 
         # Set the bound to be equal to the lowest f-score encountered.
         bound = score
+        iter_count += 1
