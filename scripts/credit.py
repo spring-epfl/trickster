@@ -13,11 +13,7 @@ import pandas as pd
 
 from trickster.adversarial_helper import *
 from trickster.expansion import *
-
-from sklearn.utils import shuffle
-from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import LogisticRegressionCV
-from tqdm import tqdm
 
 ###########################################
 ###########################################
@@ -33,7 +29,9 @@ np.random.seed(seed=SEED)
 
 # Define experiment helper functions.
 def load_transform_data_fn(data_file, bins, **kwargs):
-    '''Description goes here.'''
+    '''
+    Load and preprocess data, returning the examples and labels as numpy.
+    '''
     # Load the file
     df = pd.read_csv(data_file)
 
@@ -59,13 +57,15 @@ def load_transform_data_fn(data_file, bins, **kwargs):
     df_y = df.iloc[:, -1]
 
     # Convert to numpy.
-    X = df_X.values.astype('intc')
-    y = df_y.values.astype('intc')
+    X = df_X.values.astype('float')
+    y = df_y.values.astype('float')
 
     return X, y, df_X.columns
 
 def clf_fit_fn(X_train, y_train, **kwargs):
-    '''Fit logistic regression by performing a Grid Search with Cross Validation.'''
+    '''
+    Fit logistic regression by performing a Grid Search with Cross Validation.
+    '''
     Cs = np.arange(0.1, 2, 0.025)
     class_weight = None # balanced or None
     scoring = 'f1' # accuracy, f1 or roc_auc
@@ -84,21 +84,22 @@ def clf_fit_fn(X_train, y_train, **kwargs):
     return clf
 
 def get_expansions_fn(features, expand_quantized_fn, **kwargs):
-    '''Add description here.'''
-
+    '''
+    Define expansions to perform on features and obtain feature indexes.
+    '''
     # Find indexes of required features in the original feature space.
-    idxs_credit = substring_index(features, 'Credit amount')
-    idxs_duration = substring_index(features, 'Duration')
-    idxs_purpose = substring_index(features, 'Purpose')
+    idxs_credit = find_substring_occurences(features, 'Credit amount')
+    idxs_duration = find_substring_occurences(features, 'Duration')
+    idxs_purpose = find_substring_occurences(features, 'Purpose')
 
     # Concatenate indexes of transformable features.
     transformable_feature_idxs = sorted(idxs_credit + idxs_duration + idxs_purpose)
     reduced_features = features[transformable_feature_idxs]
 
     # Find indexes of required features in the reduced feature space.
-    idxs_credit = substring_index(reduced_features, 'Credit amount')
-    idxs_duration = substring_index(reduced_features, 'Duration')
-    idxs_purpose = substring_index(reduced_features, 'Purpose')
+    idxs_credit = find_substring_occurences(reduced_features, 'Credit amount')
+    idxs_duration = find_substring_occurences(reduced_features, 'Duration')
+    idxs_purpose = find_substring_occurences(reduced_features, 'Purpose')
 
     # Set required expansions for features in the reduced feature space.
     expansions = [
@@ -128,8 +129,9 @@ if __name__ == "__main__":
     # Define dataset location.
     data_file = '../data/german_credit_data.csv'
 
-    # Define bin counts to use.
+    # Define experiment parameters.
     bin_counts = np.arange(5, 101, 5)
+    p_norm, q_norm = 1, np.inf
 
     results = []
 
@@ -143,6 +145,8 @@ if __name__ == "__main__":
             load_transform_data_fn=load_transform_data_fn,
             data_file=data_file,
             bins=bins,
+            p_norm=p_norm,
+            q_norm=q_norm,
             clf_fit_fn=clf_fit_fn,
             get_expansions_fn=get_expansions_fn,
             expand_quantized_fn=expand_quantized,
