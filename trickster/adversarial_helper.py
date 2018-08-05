@@ -135,10 +135,14 @@ class Node(object):
 
     @property
     def features(self):
+        if hasattr(self, '_features'):
+            return self._features
+
         if self.feature_extract_fn is None:
             return self.src
         else:
-            return self.feature_extract_fn(self.src)
+            self._features = self.feature_extract_fn(self.src)
+            return self._features
 
     def expand(self, expansions):
         children = []
@@ -148,7 +152,7 @@ class Node(object):
         counter.increment()
 
         for child in expand(self.src, expansions):
-            children.append(Node(
+            children.append(self.__class__(
                 child, self.depth+1,
                 feature_extract_fn=self.feature_extract_fn))
 
@@ -403,8 +407,8 @@ def experiment_wrapper(
     # Fit and evaluate the classifier.
     clf = clf_fit_fn(X_train, y_train, **clf_fit_kwargs)
     train_score, test_score = clf.score(X_train, y_train)*100, clf.score(X_test, y_test)*100
-    # logger.debug("Resulting training accuracy is: {:.2f}%. Test accuracy is: {:.2f}%.\n"
-    #            .format(train_score, test_score))
+    logger.debug("Resulting training accuracy is: {:.2f}%. Test accuracy is: {:.2f}%.\n"
+               .format(train_score, test_score))
 
     # Estimate contribution of each (transformable) feature to the classifier performance.
     logger.debug('Computing importance of each feature based on the classifier parameters.')
@@ -412,7 +416,7 @@ def experiment_wrapper(
     importance_coef = None
 
     # Indices of examples in the original class.
-    preds = clf.predict_proba(X)[:, target_class]
+    preds = clf.predict_proba(X_test)[:, target_class]
     idxs, = np.where(
         (preds < target_confidence) & (preds >= target_confidence - confidence_margin))
 
@@ -424,7 +428,7 @@ def experiment_wrapper(
             **search_kwargs)
     with search_params.as_default():
         search_results = dataset_find_adversarial_examples(
-            dataset=X,
+            dataset=X_test,
             idxs=idxs,
             transformable_feature_idxs=transformable_feature_idxs,
             search_fn=a_star_search,
@@ -442,7 +446,7 @@ def experiment_wrapper(
         logger.debug('Searching for adversarial examples for {} observations using a baseline search...'.format(len(idxs)))
         with search_params.as_default():
             baseline_results = baseline_dataset_find_examples_fn(
-                dataset=X,
+                dataset=X_test,
                 idxs=idxs,
                 transformable_feature_idxs=transformable_feature_idxs,
                 search_fn=a_star_search,
