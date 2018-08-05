@@ -1,16 +1,13 @@
-import sys
-sys.path.append('..')
-
 # Ignore warnings.
+import sys
 import warnings
 warnings.filterwarnings('ignore')
 
-# Handle library imports.
+import attr
 import numpy as np
 import pandas as pd
 import logging
 
-from trickster.search import a_star_search, ida_star_search
 from trickster.expansion import expand
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegressionCV
@@ -34,15 +31,16 @@ LOGGER_NAME = 'adversarial'
 
 # Define useful helper functions.
 
-def setup_custom_logger(log_file='../logging/output.log'):
-    '''Set up a logger object to print info to stdout and debug to file.'''
+
+def setup_custom_logger(log_file='_logging/output.log'):
+    """Set up a logger object to print info to stdout and debug to file."""
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter(fmt='[%(asctime)s - %(levelname)-4s] >> %(message)s',
                                   datefmt='%Y-%m-%d %H:%M:%S')
 
-    handler = logging.FileHandler(log_file, mode='w')
+    handler = logging.FileHandler(log_file, mode='a')
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -55,10 +53,10 @@ def setup_custom_logger(log_file='../logging/output.log'):
     return logger
 
 def get_feature_coef_importance(X, clf, transformable_feature_idxs):
-    '''
+    """
     Get the most important features from the transformable feature set
     based on classifier parameters.
-    '''
+    """
     if issparse(X):
         X = X[:, transformable_feature_idxs].toarray()
     else:
@@ -70,10 +68,10 @@ def get_feature_coef_importance(X, clf, transformable_feature_idxs):
     return sorted(importance_coef, key=lambda x: x[1], reverse=True)
 
 def get_feature_diff_importance(difference, transformable_feature_idxs):
-    '''
+    """
     Get the most important features from the transformable feature set
     based on the feature difference between the initial and adversarial example.
-    '''
+    """
     difference = CollectionsCounter([item for sublist in difference for item in sublist])
     cnts_sum = np.sum([v for k, v in difference.items()])
     importance_diff = [(idx, cnt / cnts_sum) for idx, cnt in difference.items()]
@@ -81,12 +79,12 @@ def get_feature_diff_importance(difference, transformable_feature_idxs):
     return sorted(importance_diff, key=lambda x: x[1], reverse=True)
 
 def find_substring_occurences(xs, item):
-    '''Can be used to get the indexes of the required substring within a list of strings.'''
+    """Can be used to get the indexes of the required substring within a list of strings."""
     idxs = [i for (i, x) in enumerate(xs) if item in x]
     return idxs
 
 def create_reduced_classifier(clf, x, transformable_feature_idxs):
-    '''Construct a reduced classifier based on the original one.'''
+    """Construct a reduced classifier based on the original one."""
 
     # Establish non-transformable feature indexes.
     feature_idxs = np.arange(x.size)
@@ -110,32 +108,27 @@ class CounterLimitExceededError(Exception):
     pass
 
 @with_default_context(use_empty_init=True)
-class Counter:
+class ExpansionCounter:
+    """Context-local counter of expanded nodes."""
 
-    def __init__(self, counter_lim=None, debug_freq=None, **kwargs):
-        self.cnt = 0
+    def __init__(self, counter_lim=None, debug_freq=None):
+        self.count = 0
         self.counter_lim = counter_lim
         self.debug_freq = debug_freq
 
     def increment(self):
         logger = logging.getLogger(LOGGER_NAME)
-        if self.counter_lim is not None and self.cnt > self.counter_lim:
+        if self.counter_lim is not None and self.count > self.counter_lim:
             raise CounterLimitExceededError('Expansion counter limit {} reached.'.format(self.counter_lim))
-        if self.debug_freq is not None and self.cnt % self.debug_freq == 0:
-            logger.debug('Node counter is: {}.'.format(self.cnt))
-        self.cnt += 1
+        if self.debug_freq is not None and self.count % self.debug_freq == 0:
+            logger.debug('Node counter is: {}.'.format(self.count))
+        self.count += 1
 
-    def set_count(self, count):
-        self.cnt = count
-
-    def get_count(self):
-        return self.cnt
-
-
-# TODO: add original (raw) features to Node class.
-class Node:
+class Node(object):
+    """Single node in a transformation graph."""
 
     def __init__(self, x, depth=0):
+        self.src = x
         self.features = x
         self.depth = depth
 
@@ -143,7 +136,7 @@ class Node:
         children = []
 
         # Increment the counter of expanded nodes.
-        counter = Counter.get_default()
+        counter = ExpansionCounter.get_default()
         counter.increment()
 
         for child_features in expand(self.features, expansions):
@@ -152,102 +145,143 @@ class Node:
         return children
 
     def __repr__(self):
-        return 'Node({})'.format(self.features)
+        return 'Node(x={}, depth={})'.format(self.features, self.depth)
+
+    def __eq__(self, other):
+        return self.features == other.features
 
 ###########################################
 ###########################################
 ###########################################
 
 # Functions that perform adversarial example search.
+@with_default_context
+@attr.s
+class SearchParams:
+    """Parameters for a single search instance."""
+    clf = attr.ib()
+    expansions = attr.ib()
+    target_class = attr.ib(default=1)
+    target_confidence = attr.ib(default=.5)
+    p_norm = attr.ib(default=1)
+    q_norm = attr.ib(default=np.inf)
+    epsilon = attr.ib(default=1)
 
 @profiled
-def find_adversarial(x, clf, epsilon, search_fn, expansions, zero_to_one,
-        target_confidence=0.5, p_norm=1, q_norm=np.inf, return_path=False, **kwargs):
-    """Transform an example until it is classified with target confidence."""
+def default_expand_fn(x):
+    """Expand x and compute the costs.
+    Returns a list of tuples (child, cost)
+    """
+    search_params = SearchParams.get_default()
+    children = x.expand(search_params.expansions)
+    costs = [np.linalg.norm(x.features - c.features, ord=search_params.p_norm) for c in children]
 
-    def default_expand_fn(x, expansions, p_norm=1):
-        """Expand x and compute the costs.
-        Returns a list of tuples (child, cost)
-        """
+    return list(zip(children, costs))
 
-        children = x.expand(expansions)
-        costs = [np.linalg.norm(x.features - c.features, ord=p_norm) for c in children]
+@profiled
+def default_goal_fn(x):
+    """Tell whether the example has reached the goal."""
+    search_params = SearchParams.get_default()
+    return search_params.clf.predict_proba([x.features])[0, search_params.target_class] >= search_params.target_confidence
 
-        return list(zip(children, costs))
+@profiled
+def default_heuristic_fn(x):
+    """Distance to the decision boundary of a logistic regression classifier.
+    By default the distance is w.r.t. L1 norm. This means that the denominator
+    has to be in terms of the Holder dual norm (`q_norm`), so L-inf. I know,
+    this interface is horrible.
+    NOTE: The value has to be zero if the example is already on the target side
+    of the boundary.
+    """
+    search_params = SearchParams.get_default()
+    confidence = search_params.clf.predict_proba([x.features])[0, search_params.target_class]
+    if confidence >= search_params.target_confidence:
+        return 0.0
+    score = search_params.clf.decision_function([x.features])[0]
+    h = np.abs(score) / np.linalg.norm(search_params.clf.coef_[0], ord=search_params.q_norm)
+    return h * search_params.epsilon
 
-    def default_goal_fn(x, clf, zero_to_one, target_confidence=0.5):
-        """Tell whether the example has reached the goal."""
-        if zero_to_one:
-            return clf.predict_proba([x.features])[0, 1] >= target_confidence
-        else:
-            return clf.predict_proba([x.features])[0, 1] <= target_confidence
+@profiled
+def default_hash_fn(x):
+    """Hash function for examples."""
+    return hash(x.features.tostring())
 
-    def default_heuristic_fn(x, clf, epsilon, zero_to_one, q_norm=np.inf):
-        """Distance to the decision boundary of a logistic regression classifier.
-        By default the distance is w.r.t. L1 norm. This means that the denominator
-        has to be in terms of the Holder dual norm (`q_norm`), so L-inf. I know,
-        this interface is horrible.
-        NOTE: The value has to be zero if the example is already on the target side
-        of the boundary.
-        """
-        confidence = clf.predict_proba([x.features])[0, 1]
-        if zero_to_one and confidence >= target_confidence:
-            return 0.0
-        elif not zero_to_one and confidence <= target_confidence:
-            return 0.0
-        score = clf.decision_function([x.features])[0]
-        h = np.abs(score) / np.linalg.norm(clf.coef_[0], ord=q_norm)
-        return h * epsilon
+@profiled
+def default_example_wrapper_fn(x):
+    """Initial example data to a search graph node."""
+    return Node(x)
 
-    def default_hash_fn(x):
-        """Hash function for examples."""
-        return hash(x.features.tostring())
+def default_real_cost_fn(x, another):
+    """Real cost for transforming example into another one."""
+    search_params = SearchParams.get_default()
+    return np.linalg.norm(x.features - another.features, ord=search_params.p_norm)
 
-    expand_fn = kwargs.get('expand_fn', default_expand_fn)
-    goal_fn = kwargs.get('goal_fn', default_goal_fn)
-    heuristic_fn = kwargs.get('heuristic_fn', default_heuristic_fn)
-    hash_fn = kwargs.get('hash_fn', default_hash_fn)
+@attr.s
+class SearchFuncs:
+    example_wrapper_fn = attr.ib(default=attr.Factory(
+        lambda: default_example_wrapper_fn))
+    expand_fn = attr.ib(default=attr.Factory(lambda: default_expand_fn))
+    goal_fn = attr.ib(default=attr.Factory(lambda: default_goal_fn))
+    heuristic_fn = attr.ib(default=attr.Factory(lambda: default_heuristic_fn))
+    hash_fn = attr.ib(default=attr.Factory(lambda: default_hash_fn))
+    real_cost_fn = attr.ib(default=attr.Factory(lambda: default_real_cost_fn))
 
-    x = Node(x)
-
+@profiled
+def find_adversarial_example(example, search_fn, search_funcs,
+                             return_path=False, search_kwargs=None):
+    """Transform an example until it is classified as target."""
+    search_kwargs = search_kwargs or {}
+    wrapped_example = search_funcs.example_wrapper_fn(example)
     return search_fn(
-        start_node=x,
-        expand_fn=lambda x: expand_fn(x, expansions, p_norm=p_norm),
-        goal_fn=lambda x: goal_fn(x, clf, zero_to_one, target_confidence),
-        heuristic_fn=lambda x: heuristic_fn(x, clf, epsilon, zero_to_one, q_norm=q_norm),
-        hash_fn=hash_fn,
-        return_path=return_path
+        start_node=wrapped_example,
+        expand_fn=search_funcs.expand_fn,
+        goal_fn=search_funcs.goal_fn,
+        heuristic_fn=search_funcs.heuristic_fn,
+        hash_fn=search_funcs.hash_fn,
+        return_path=return_path,
+        **search_kwargs
     )
 
 @profiled
-def adversarial_search(X, idxs, clf, expansions,
-    p_norm, q_norm, transformable_feature_idxs, **kwargs):
+def dataset_find_adversarial_examples(
+        dataset,
+        idxs,
+        search_fn,
+        search_funcs,
+        transformable_feature_idxs=None,
+        counter_kwargs=None,
+        **kwargs):
     """Find adversarial examples for specified indexes."""
     logger = logging.getLogger(LOGGER_NAME)
+    counter_kwargs = counter_kwargs or {}
 
     # Dataframe for storing the results.
     results = pd.DataFrame(
-        columns=['index', 'found', 'expansions', 'x', 'init_confidence',
-                 'x_adv', 'adv_confidence', 'real_cost', 'path_cost',
+        columns=['index', 'found', 'expansions', 'x_features', 'init_confidence',
+                 'x_adv_features', 'adv_confidence', 'real_cost', 'path_cost',
                  'optimal_path', 'difference', 'nodes_expanded', 'runtime']
     )
 
     for i, idx in enumerate(tqdm(idxs, ascii=True)):
-
-        logger.debug('Searching for adversarial example {}/{} using initial observation at index: {}.'
+        logger.debug('Searching for adversarial example {}/{} using initial example at index: {}.'
             .format(i, len(idxs), idx))
 
-        if issparse(X):
-            x = X[idx].toarray()[0]
-        else:
-            x = X[idx]
+        orig_example = dataset[idx]
+        if issparse(orig_example): orig_example = orig_example.toarray()
 
         # Transform x and the classifier to operate in the reduced feature space.
-        x_reduced = x[transformable_feature_idxs]
-        clf_reduced = create_reduced_classifier(clf, x, transformable_feature_idxs)
+        orig_search_params = SearchParams.get_default()
+        if transformable_feature_idxs is not None:
+            clf_reduced = create_reduced_classifier(
+                    orig_search_params.clf, orig_example, transformable_feature_idxs)
+            example = orig_example[transformable_feature_idxs]
+            search_params = attr.evolve(orig_search_params, clf=clf_reduced)
+        else:
+            example = orig_example
+            search_params = orig_search_params
 
         # Instantiate a counter for expanded nodes, and a profiler.
-        expanded_counter = Counter(**kwargs)
+        expanded_counter = ExpansionCounter(**counter_kwargs)
         per_example_profiler = Profiler()
 
         x_adv, x_adv_reduced, adv_found = None, None, None
@@ -255,14 +289,12 @@ def adversarial_search(X, idxs, clf, expansions,
         real_cost, path_cost = None, None
         runtime, optimal_path = None, None
 
-        with expanded_counter.as_default(), per_example_profiler.as_default():
+        with expanded_counter.as_default(), per_example_profiler.as_default(), search_params.as_default():
             try:
-                x_adv_reduced, path_costs, optimal_path = find_adversarial(
-                    x=x_reduced,
-                    clf=clf_reduced,
-                    expansions=expansions,
-                    p_norm=p_norm,
-                    q_norm=q_norm,
+                x_adv_reduced, path_costs, optimal_path = find_adversarial_example(
+                    example=example,
+                    search_fn=search_fn,
+                    search_funcs=search_funcs,
                     return_path=True,
                     **kwargs
                 )
@@ -270,35 +302,41 @@ def adversarial_search(X, idxs, clf, expansions,
                     adv_found = False
                 else:
                     adv_found = True
-                    # TODO: Either make return_path return one path cost only or pass in the hash function
-                    path_cost = path_costs[hash(x_adv_reduced.features.tostring())]
+                    path_cost = path_costs[search_funcs.hash_fn(x_adv_reduced)]
 
             except CounterLimitExceededError as e:
                 logger.debug('WARN! For observation at index {}: {}'.format(idx, e))
 
         # Record some basic statistics.
-        nodes_expanded = expanded_counter.get_count()
-        init_confidence = clf_reduced.predict_proba([x_reduced])[0, 1]
-        expands = [(idxs, fn.__name__) for (idxs, fn) in expansions]
+        nodes_expanded = expanded_counter.count
+        init_confidence = clf_reduced.predict_proba([example])[0, search_params.target_class]
+        expands = [(idxs, fn.__name__) for (idxs, fn) in search_params.expansions]
         runtime_stats = per_example_profiler.compute_stats()
-        if 'find_adversarial' in runtime_stats:
-            runtime = runtime_stats['find_adversarial']['tot']
+        if 'find_adversarial_example' in runtime_stats:
+            runtime = runtime_stats['find_adversarial_example']['tot']
 
         if x_adv_reduced is not None:
-            logger.debug('Adversarial example found {}/{} found using initial observation at index: {}!'
+            logger.debug('Adversarial example {}/{} found from the initial index: {}!'
                 .format(i, len(idxs), idx))
             # Construct the actual adversarial example.
-            x_adv = np.array(x)
-            x_adv[transformable_feature_idxs] = x_adv_reduced.features
+            if transformable_feature_idxs is not None:
+                x_adv = search_funcs.example_wrapper_fn(np.array(orig_example))
+                # TODO: Fix when feature space does not equal the source space.
+                x_adv.src = x_adv_reduced.src
+                x_adv.features[transformable_feature_idxs] = x_adv_reduced.features
+            else:
+                x_adv = x_adv_reduced
 
             # Compute further statistics.
-            adv_confidence = clf.predict_proba([x_adv])[0, 1]
-            real_cost = np.linalg.norm(x - x_adv, ord=p_norm)
-            difference, = np.where(x != x_adv)
+            adv_confidence = orig_search_params.clf.predict_proba([x_adv.features])[
+                    0, orig_search_params.target_class]
+            real_cost = search_funcs.real_cost_fn(
+                    search_funcs.example_wrapper_fn(orig_example), x_adv)
+            difference, = np.where(orig_example != x_adv.features)
 
         results.loc[i] = [
-            idx, adv_found, expands, x, init_confidence,
-            x_adv, adv_confidence, real_cost, path_cost,
+            idx, adv_found, expands, orig_example, init_confidence,
+            x_adv.features, adv_confidence, real_cost, path_cost,
             optimal_path, difference, nodes_expanded, runtime
         ]
 
@@ -309,28 +347,51 @@ def adversarial_search(X, idxs, clf, expansions,
 ###########################################
 
 # Define a wrapper function to perform experiments.
-def experiment_wrapper(load_transform_data_fn, get_expansions_fn, clf_fit_fn,
-    target_confidence, benchmark_search_fn=None, zero_to_one=True, **kwargs):
-    '''
+def experiment_wrapper(
+        load_transform_data_fn,
+        get_expansions_fn,
+        clf_fit_fn,
+        search_fn,
+        target_class=1.,
+        target_confidence=.5,
+        confidence_margin=1.,
+        search_funcs=None,
+        search_kwargs=None,
+        baseline_dataset_find_examples_fn=None,
+        load_kwargs=None,
+        get_expansions_kwargs=None,
+        clf_fit_kwargs=None,
+        logger=None,
+        random_state=None,
+        test_size=0.1):
+    """
     A wrapper designed to find adversarial examples for different application domains.
-    '''
-    logger = kwargs['logger'] if 'logger' in kwargs else setup_custom_logger()
-    random_state = kwargs['random_state'] if 'random_state' in kwargs else 2018
+
+    One experiment finds adversarial examples for one model and a dataset.
+    """
+    search_kwargs = search_kwargs or {}
+    load_kwargs = load_kwargs or {}
+    get_expansions_kwargs = get_expansions_kwargs or {}
+    clf_fit_kwargs = clf_fit_kwargs or {}
+    logger = logger or setup_custom_logger()
+    search_funcs = search_funcs or SearchFuncs()
+
+    random_state = 1 if random_state is None else random_state
     np.random.seed(random_state)
 
     # Load and prepare data for learning.
-    X, y, features = load_transform_data_fn(**kwargs)
+    X, y, features = load_transform_data_fn(**load_kwargs)
     logger.debug('Shape of X: {}. Shape of y: {}.'.format(X.shape, y.shape))
 
     # Get required expansions and sorted indexes of transformable features.
-    expansions, transformable_feature_idxs = get_expansions_fn(features, **kwargs)
+    expansions, transformable_feature_idxs = get_expansions_fn(features, **get_expansions_kwargs)
 
     # Split into training and test sets.
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=random_state)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
     logger.debug('Number of training points: {}. Number of test points: {}.'.format(X_train.shape[0], X_test.shape[0]))
 
     # Fit and evaluate the classifier.
-    clf = clf_fit_fn(X_train, y_train, **kwargs)
+    clf = clf_fit_fn(X_train, y_train, **clf_fit_kwargs)
     train_score, test_score = clf.score(X_train, y_train)*100, clf.score(X_test, y_test)*100
     logger.debug("Resulting training accuracy is: {:.2f}%. Test accuracy is: {:.2f}%.\n"
                 .format(train_score, test_score))
@@ -340,40 +401,41 @@ def experiment_wrapper(load_transform_data_fn, get_expansions_fn, clf_fit_fn,
     importance_coef = get_feature_coef_importance(X, clf, transformable_feature_idxs)
 
     # Indices of examples in the original class.
-    confidence_margin = kwargs.get('confidence_margin', 1)
-    if zero_to_one:
-        idxs, = np.where(
-            (clf.predict_proba(X)[:, 1] < target_confidence) &
-            (clf.predict_proba(X)[:, 1] >= target_confidence - confidence_margin)
-        )
-    else:
-        idxs, = np.where(
-            (clf.predict_proba(X)[:, 1] > target_confidence) &
-            (clf.predict_proba(X)[:, 1] <= target_confidence + confidence_margin)
-        )
+    preds = clf.predict_proba(X)[:, target_class]
+    idxs, = np.where(
+        (preds < target_confidence) & (preds >= target_confidence - confidence_margin))
 
     # Perform adversarial example search using A* search.
     logger.debug('Searching for adversarial examples for {} observations using A* algorithm...'.format(len(idxs)))
-    search_results = adversarial_search(
-        X=X, idxs=idxs, clf=clf, expansions=expansions, target_confidence=target_confidence,
-        transformable_feature_idxs=transformable_feature_idxs, epsilon=1,
-        search_fn=a_star_search, zero_to_one=zero_to_one, **kwargs
-    )
+    search_params = SearchParams(
+            clf=clf, expansions=expansions,
+            target_class=target_class, target_confidence=target_confidence,
+            **search_kwargs)
+    with search_params.as_default():
+        search_results = dataset_find_adversarial_examples(
+            dataset=X,
+            idxs=idxs,
+            transformable_feature_idxs=transformable_feature_idxs,
+            search_fn=search_fn,
+            search_funcs=search_funcs,
+        )
 
     # Compute feature importance based on the count of feature transformations.
     logger.debug('Computing importance of each feature based on difference between "x" and adversarial "x".')
     importance_diff = get_feature_diff_importance(search_results['difference'], transformable_feature_idxs)
 
-    # Perform adversarial example search using a benchmark search.
-    benchmark_results = None
-    if benchmark_search_fn is not None:
-        logger.debug('Searching for adversarial examples for {} observations using a benchmark search...'.format(len(idxs)))
-        benchmark_results = benchmark_search_fn(
-            X=X, idxs=idxs, clf=clf, expansions=expansions, target_confidence=target_confidence,
-            transformable_feature_idxs=transformable_feature_idxs, epsilon=1,
-            search_fn=a_star_search, zero_to_one=zero_to_one,
-            logger_name=LOGGER_NAME, **kwargs
-        )
+    # Perform adversarial example search using a baseline search.
+    baseline_results = None
+    if baseline_dataset_find_examples_fn is not None:
+        logger.debug('Searching for adversarial examples for {} observations using a baseline search...'.format(len(idxs)))
+        with search_params.as_default():
+            baseline_results = baseline_dataset_find_examples_fn(
+                dataset=X,
+                idxs=idxs,
+                transformable_feature_idxs=transformable_feature_idxs,
+                search_fn=search_fn,
+                search_funcs=search_funcs
+            )
 
     # Output result.
     result = {
@@ -393,7 +455,7 @@ def experiment_wrapper(load_transform_data_fn, get_expansions_fn, clf_fit_fn,
         'avg_real_cost': search_results['real_cost'].mean(),
         'avg_counter': search_results['nodes_expanded'].mean(),
         'avg_runtime': search_results['runtime'].mean(),
-        'benchmark_results': benchmark_results,
+        'baseline_results': baseline_results,
         'search_results': search_results
     }
 

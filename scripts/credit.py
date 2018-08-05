@@ -11,6 +11,7 @@ warnings.filterwarnings('ignore')
 import numpy as np
 import pandas as pd
 
+from trickster.search import a_star_search, ida_star_search
 from trickster.adversarial_helper import *
 from trickster.expansion import *
 from sklearn.linear_model import LogisticRegressionCV
@@ -110,10 +111,10 @@ def get_expansions_fn(features, expand_quantized_fn, **kwargs):
 
     return expansions, transformable_feature_idxs
 
-def benchmark_search_fn(**kwargs):
-    '''Perform BFS adversarial example search to benchmark against A* search.'''
-    heuristic_fn = lambda x, clf, epsilon, zero_to_one, q_norm: 0
-    results = adversarial_search(heuristic_fn=heuristic_fn, **kwargs)
+def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
+    '''Perform BFS adversarial example search to baseline against A* search.'''
+    search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
+    results = dataset_find_adversarial_examples(search_funcs=search_funcs, **kwargs)
     return results
 
 ###########################################
@@ -123,13 +124,13 @@ def benchmark_search_fn(**kwargs):
 # Main function.
 if __name__ == "__main__":
     # Setup a custom logger.
-    log_file = '../logging/credit_output.log'
+    log_file = '_logging/credit_output.log'
     logger = setup_custom_logger(log_file)
 
     # Define dataset location.
-    data_file = '../data/german_credit_data.csv'
+    data_file = 'notebooks/data/german_credit_data.csv'
 
-    # Define experiment parameters.
+    # Define meta-experiment parameters.
     bin_counts = np.arange(5, 101, 5)
     p_norm, q_norm = 1, np.inf
 
@@ -143,22 +144,18 @@ if __name__ == "__main__":
         logger.info("Loading and preprocessing input data for {} bins...".format(bins))
         result = experiment_wrapper(
             load_transform_data_fn=load_transform_data_fn,
-            data_file=data_file,
-            bins=bins,
-            p_norm=p_norm,
-            q_norm=q_norm,
+            load_kwargs=dict(data_file=data_file, bins=bins),
             clf_fit_fn=clf_fit_fn,
+            target_class=1,
+            search_fn=a_star_search,
             get_expansions_fn=get_expansions_fn,
-            expand_quantized_fn=expand_quantized,
-            benchmark_search_fn=benchmark_search_fn,
-            target_confidence=0.5,
-            zero_to_one=True,
+            get_expansions_kwargs=dict(expand_quantized_fn=expand_quantized),
+            baseline_dataset_find_examples_fn=baseline_detaset_find_examples_fn,
+            logger=logger,
             random_state=SEED,
-            logger=logger
         )
 
         result['bins'] = bins
 
         results.append(result)
-
-    import pdb; pdb.set_trace()
+        import ipdb; ipdb.set_trace()
