@@ -130,7 +130,7 @@ if __name__ == "__main__":
     # Define dataset location.
     data_file = 'notebooks/data/german_credit_data.csv'
 
-    # Define meta-experiment parameters.
+    # Define the meta-experiment parameters.
     bin_counts = np.arange(5, 101, 5)
     p_norm, q_norm = 1, np.inf
 

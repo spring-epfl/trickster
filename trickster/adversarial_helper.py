@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import logging
 
+from trickster.search import a_star_search
 from trickster.expansion import expand
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegressionCV
@@ -127,10 +128,17 @@ class ExpansionCounter:
 class Node(object):
     """Single node in a transformation graph."""
 
-    def __init__(self, x, depth=0):
+    def __init__(self, x, depth=0, feature_extract_fn=None):
         self.src = x
-        self.features = x
         self.depth = depth
+        self.feature_extract_fn = feature_extract_fn
+
+    @property
+    def features(self):
+        if self.feature_extract_fn is None:
+            return self.src
+        else:
+            return self.feature_extract_fn(self.src)
 
     def expand(self, expansions):
         children = []
@@ -139,16 +147,20 @@ class Node(object):
         counter = ExpansionCounter.get_default()
         counter.increment()
 
-        for child_features in expand(self.features, expansions):
-            children.append(Node(child_features, self.depth+1))
+        for child in expand(self.src, expansions):
+            children.append(Node(
+                child, self.depth+1,
+                feature_extract_fn=self.feature_extract_fn))
 
         return children
 
     def __repr__(self):
-        return 'Node(x={}, depth={})'.format(self.features, self.depth)
+        return '{}(x={}, depth={})'.format(
+                self.__class__.__name__,
+                self.src, self.depth)
 
     def __eq__(self, other):
-        return self.features == other.features
+        return self.src == other.src
 
 ###########################################
 ###########################################
@@ -174,7 +186,7 @@ def default_expand_fn(x):
     """
     search_params = SearchParams.get_default()
     children = x.expand(search_params.expansions)
-    costs = [np.linalg.norm(x.features - c.features, ord=search_params.p_norm) for c in children]
+    costs = [np.linalg.norm(x.src - c.src, ord=search_params.p_norm) for c in children]
 
     return list(zip(children, costs))
 
@@ -182,7 +194,8 @@ def default_expand_fn(x):
 def default_goal_fn(x):
     """Tell whether the example has reached the goal."""
     search_params = SearchParams.get_default()
-    return search_params.clf.predict_proba([x.features])[0, search_params.target_class] >= search_params.target_confidence
+    return search_params.clf.predict_proba([x.src])[
+            0, search_params.target_class] >= search_params.target_confidence
 
 @profiled
 def default_heuristic_fn(x):
@@ -194,17 +207,17 @@ def default_heuristic_fn(x):
     of the boundary.
     """
     search_params = SearchParams.get_default()
-    confidence = search_params.clf.predict_proba([x.features])[0, search_params.target_class]
+    confidence = search_params.clf.predict_proba([x.src])[0, search_params.target_class]
     if confidence >= search_params.target_confidence:
         return 0.0
-    score = search_params.clf.decision_function([x.features])[0]
+    score = search_params.clf.decision_function([x.src])[0]
     h = np.abs(score) / np.linalg.norm(search_params.clf.coef_[0], ord=search_params.q_norm)
     return h * search_params.epsilon
 
 @profiled
 def default_hash_fn(x):
     """Hash function for examples."""
-    return hash(x.features.tostring())
+    return hash(x.src.tostring())
 
 @profiled
 def default_example_wrapper_fn(x):
@@ -214,7 +227,7 @@ def default_example_wrapper_fn(x):
 def default_real_cost_fn(x, another):
     """Real cost for transforming example into another one."""
     search_params = SearchParams.get_default()
-    return np.linalg.norm(x.features - another.features, ord=search_params.p_norm)
+    return np.linalg.norm(x.src - another.src, ord=search_params.p_norm)
 
 @attr.s
 class SearchFuncs:
@@ -228,7 +241,7 @@ class SearchFuncs:
 
 @profiled
 def find_adversarial_example(example, search_fn, search_funcs,
-                             return_path=False, search_kwargs=None):
+        return_path=False, search_kwargs=None):
     """Transform an example until it is classified as target."""
     search_kwargs = search_kwargs or {}
     wrapped_example = search_funcs.example_wrapper_fn(example)
@@ -321,22 +334,20 @@ def dataset_find_adversarial_examples(
             # Construct the actual adversarial example.
             if transformable_feature_idxs is not None:
                 x_adv = search_funcs.example_wrapper_fn(np.array(orig_example))
-                # TODO: Fix when feature space does not equal the source space.
-                x_adv.src = x_adv_reduced.src
-                x_adv.features[transformable_feature_idxs] = x_adv_reduced.features
+                x_adv.src[transformable_feature_idxs] = x_adv_reduced.src
             else:
                 x_adv = x_adv_reduced
 
             # Compute further statistics.
-            adv_confidence = orig_search_params.clf.predict_proba([x_adv.features])[
+            adv_confidence = orig_search_params.clf.predict_proba([x_adv.src])[
                     0, orig_search_params.target_class]
             real_cost = search_funcs.real_cost_fn(
                     search_funcs.example_wrapper_fn(orig_example), x_adv)
-            difference, = np.where(orig_example != x_adv.features)
+            difference, = np.where(orig_example != x_adv.src)
 
         results.loc[i] = [
             idx, adv_found, expands, orig_example, init_confidence,
-            x_adv.features, adv_confidence, real_cost, path_cost,
+            x_adv.src, adv_confidence, real_cost, path_cost,
             optimal_path, difference, nodes_expanded, runtime
         ]
 
@@ -351,7 +362,6 @@ def experiment_wrapper(
         load_transform_data_fn,
         get_expansions_fn,
         clf_fit_fn,
-        search_fn,
         target_class=1.,
         target_confidence=.5,
         confidence_margin=1.,
@@ -393,12 +403,13 @@ def experiment_wrapper(
     # Fit and evaluate the classifier.
     clf = clf_fit_fn(X_train, y_train, **clf_fit_kwargs)
     train_score, test_score = clf.score(X_train, y_train)*100, clf.score(X_test, y_test)*100
-    logger.debug("Resulting training accuracy is: {:.2f}%. Test accuracy is: {:.2f}%.\n"
-                .format(train_score, test_score))
+    # logger.debug("Resulting training accuracy is: {:.2f}%. Test accuracy is: {:.2f}%.\n"
+    #            .format(train_score, test_score))
 
     # Estimate contribution of each (transformable) feature to the classifier performance.
     logger.debug('Computing importance of each feature based on the classifier parameters.')
-    importance_coef = get_feature_coef_importance(X, clf, transformable_feature_idxs)
+    # importance_coef = get_feature_coef_importance(X, clf, transformable_feature_idxs)
+    importance_coef = None
 
     # Indices of examples in the original class.
     preds = clf.predict_proba(X)[:, target_class]
@@ -416,13 +427,14 @@ def experiment_wrapper(
             dataset=X,
             idxs=idxs,
             transformable_feature_idxs=transformable_feature_idxs,
-            search_fn=search_fn,
+            search_fn=a_star_search,
             search_funcs=search_funcs,
         )
 
     # Compute feature importance based on the count of feature transformations.
     logger.debug('Computing importance of each feature based on difference between "x" and adversarial "x".')
-    importance_diff = get_feature_diff_importance(search_results['difference'], transformable_feature_idxs)
+    # importance_diff = get_feature_diff_importance(search_results['difference'], transformable_feature_idxs)
+    importance_diff = None
 
     # Perform adversarial example search using a baseline search.
     baseline_results = None
@@ -433,7 +445,7 @@ def experiment_wrapper(
                 dataset=X,
                 idxs=idxs,
                 transformable_feature_idxs=transformable_feature_idxs,
-                search_fn=search_fn,
+                search_fn=a_star_search,
                 search_funcs=search_funcs
             )
 
