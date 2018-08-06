@@ -4,9 +4,9 @@ from sklearn.preprocessing import OneHotEncoder
 
 # Extract CUMUL features
 def extract(sinste):
-    # sinste: list of packet sizes
+    #sinste: list of packet sizes
 
-    # first 4 features
+    #first 4 features
 
     insize = 0
     outsize = 0
@@ -22,39 +22,40 @@ def extract(sinste):
             inpacket += 1
     features = [insize, outsize, inpacket, outpacket]
 
-    # 100 interpolants
+    #100 interpolants
+    
+    n = 100 #number of linear interpolants
 
-    n = 100  # number of linear interpolants
-
-    x = 0  # sum of absolute packet sizes
-    y = 0  # sum of packet sizes
+    x = 0 #sum of absolute packet sizes
+    y = 0 #sum of packet sizes
     graph = []
-
+    
     for si in range(0, len(sinste)):
         x += abs(sinste[si])
         y += sinste[si]
         graph.append([x, y])
 
-    # derive interpolants
-    max_x = graph[-1][0]
-    gap = float(max_x) / (n + 1)
+
+    #derive interpolants
+    max_x = graph[-1][0] 
+    gap = float(max_x)/(n+1)
     graph_ptr = 0
 
     for i in range(0, n):
-        sample_x = gap * (i + 1)
-        while graph[graph_ptr][0] < sample_x:
+        sample_x = gap * (i+1)
+        while (graph[graph_ptr][0] < sample_x):
             graph_ptr += 1
-            if graph_ptr >= len(graph) - 1:
+            if (graph_ptr >= len(graph) - 1):
                 graph_ptr = len(graph) - 1
-                # wouldn't be necessary if floats were floats
+                #wouldn't be necessary if floats were floats
                 break
         next_y = graph[graph_ptr][1]
         next_x = graph[graph_ptr][0]
-        last_y = graph[graph_ptr - 1][1]
-        last_x = graph[graph_ptr - 1][0]
+        last_y = graph[graph_ptr-1][1]
+        last_x = graph[graph_ptr-1][0]
 
-        if next_x - last_x != 0:
-            slope = (next_y - last_y) / float(next_x - last_x)
+        if (next_x - last_x != 0):
+            slope = (next_y - last_y)/float(next_x - last_x)
         else:
             slope = 1000
         sample_y = slope * (sample_x - last_x) + last_y
@@ -63,9 +64,8 @@ def extract(sinste):
 
     return features
 
-
-def load_cell(fname, time=0, ext=".cell"):
-    # time = 0 means don't load packet times (saves time and memory)
+def load_cell(fname, time=0, ext=".cell", max_len=-1):
+    #time = 0 means don't load packet times (saves time and memory)
     data = []
     starttime = -1
     try:
@@ -74,7 +74,7 @@ def load_cell(fname, time=0, ext=".cell"):
         f.close()
 
         if ext == ".htor":
-            # htor actually loads into a cell format
+            #htor actually loads into a cell format
             for li in lines:
                 psize = 0
                 if "INCOMING" in li:
@@ -86,7 +86,7 @@ def load_cell(fname, time=0, ext=".cell"):
                         data.append(psize)
                     if time == 1:
                         time = float(li.split(" ")[0])
-                        if starttime == -1:
+                        if (starttime == -1):
                             starttime = time
                         data.append([time - starttime, psize])
 
@@ -98,11 +98,11 @@ def load_cell(fname, time=0, ext=".cell"):
                     data.append(p)
                 if time == 1:
                     t = float(li[0])
-                    if starttime == -1:
+                    if (starttime == -1):
                         starttime = t
-                    data.append([t - starttime, p])
+                    data.append([t-starttime, p])
         if ext == ".burst":
-            # data is like: 1,1,1,-1,-1\n1,1,1,1,-1,-1,-1
+            #data is like: 1,1,1,-1,-1\n1,1,1,1,-1,-1,-1
             for li in lines:
                 burst = [0, 0]
                 li = li.split(",")
@@ -115,14 +115,17 @@ def load_cell(fname, time=0, ext=".cell"):
                 data.append(burst)
 
         if ext == ".pairs":
-            # data is like: [[3, 12], [1, 24]]
-            # not truly implemented
-            data = list(lines[0])
+            #data is like: [[3, 12], [1, 24]]
+            #not truly implemented
+            data = list(lines[0])            
     except:
         print("Could not load", fname)
         sys.exit(-1)
-    return data
 
+    if max_len == -1:    
+        return data
+    else:
+        return data[:max_len]
 
 def one_hot_to_indices(data):
     indices = []
@@ -130,13 +133,11 @@ def one_hot_to_indices(data):
         indices.append(list(el).index(1))
     return indices
 
-
 def pad_and_onehot(data):
     max_trace_len = len(max([x for x in data], key=len)) + 200
-    data = [np.pad(x, (0, max_trace_len - len(x)), "constant") for x in data]
+    data = [np.pad(x, (0,max_trace_len-len(x)), 'constant') for x in data]
     data = onehot(data)
     return max_trace_len, np.array(data)
-
 
 def onehot(data):
     data_ = []
@@ -145,7 +146,6 @@ def onehot(data):
         b[np.arange(len(d)), d] = 1
         data_.append(b.flatten())
     return data_
-
 
 def reverse_onehot(arr, trace_len):
     f = np.argmax(np.reshape(arr, (trace_len, 3)), axis=1)
