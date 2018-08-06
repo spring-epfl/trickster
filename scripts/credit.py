@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
 import sys
-sys.path.append('..')
+
+sys.path.append("..")
 
 # Ignore warnings.
 import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 # Handle library imports.
 import numpy as np
@@ -30,9 +32,9 @@ np.random.seed(seed=SEED)
 
 # Define experiment helper functions.
 def load_transform_data_fn(data_file, bins, **kwargs):
-    '''
+    """
     Load and preprocess data, returning the examples and labels as numpy.
-    '''
+    """
     # Load the file
     df = pd.read_csv(data_file)
 
@@ -40,82 +42,86 @@ def load_transform_data_fn(data_file, bins, **kwargs):
     df = df.drop(df.columns[0], axis=1)
 
     # Quantize credit amount, duration and age.
-    features_to_quantize = ['Credit amount', 'Duration', 'Age']
+    features_to_quantize = ["Credit amount", "Duration", "Age"]
     for feat in features_to_quantize:
         series = df.loc[:, feat]
-        df.loc[:, feat] = pd.qcut(series, bins, duplicates='drop')
+        df.loc[:, feat] = pd.qcut(series, bins, duplicates="drop")
 
     # Set Job type to object for one-hot encoding
-    df.loc[:, 'Job'] = df.loc[:, 'Job'].astype(object)
+    df.loc[:, "Job"] = df.loc[:, "Job"].astype(object)
 
     # Perform one-hot encoding
     df = pd.get_dummies(df)
     # Drop binary features
-    df = df.drop(columns=['Sex_male', 'Risk_bad'])
+    df = df.drop(columns=["Sex_male", "Risk_bad"])
 
     # Separate features from targets
     df_X = df.iloc[:, :-1]
     df_y = df.iloc[:, -1]
 
     # Convert to numpy.
-    X = df_X.values.astype('float')
-    y = df_y.values.astype('float')
+    X = df_X.values.astype("float")
+    y = df_y.values.astype("float")
 
     return X, y, df_X.columns
 
+
 def clf_fit_fn(X_train, y_train, **kwargs):
-    '''
+    """
     Fit logistic regression by performing a Grid Search with Cross Validation.
-    '''
+    """
     Cs = np.arange(0.1, 2, 0.025)
-    class_weight = None # balanced or None
-    scoring = 'f1' # accuracy, f1 or roc_auc
+    class_weight = None  # balanced or None
+    scoring = "f1"  # accuracy, f1 or roc_auc
 
     clf = LogisticRegressionCV(
         Cs=Cs,
         cv=5,
         n_jobs=-1,
-        penalty='l2',
+        penalty="l2",
         scoring=scoring,
         class_weight=class_weight,
-        random_state=SEED
+        random_state=SEED,
     )
 
     clf.fit(X_train, y_train)
     return clf
 
+
 def get_expansions_fn(features, expand_quantized_fn, **kwargs):
-    '''
+    """
     Define expansions to perform on features and obtain feature indexes.
-    '''
+    """
     # Find indexes of required features in the original feature space.
-    idxs_credit = find_substring_occurences(features, 'Credit amount')
-    idxs_duration = find_substring_occurences(features, 'Duration')
-    idxs_purpose = find_substring_occurences(features, 'Purpose')
+    idxs_credit = find_substring_occurences(features, "Credit amount")
+    idxs_duration = find_substring_occurences(features, "Duration")
+    idxs_purpose = find_substring_occurences(features, "Purpose")
 
     # Concatenate indexes of transformable features.
     transformable_feature_idxs = sorted(idxs_credit + idxs_duration + idxs_purpose)
     reduced_features = features[transformable_feature_idxs]
 
     # Find indexes of required features in the reduced feature space.
-    idxs_credit = find_substring_occurences(reduced_features, 'Credit amount')
-    idxs_duration = find_substring_occurences(reduced_features, 'Duration')
-    idxs_purpose = find_substring_occurences(reduced_features, 'Purpose')
+    idxs_credit = find_substring_occurences(reduced_features, "Credit amount")
+    idxs_duration = find_substring_occurences(reduced_features, "Duration")
+    idxs_purpose = find_substring_occurences(reduced_features, "Purpose")
 
     # Set required expansions for features in the reduced feature space.
     expansions = [
         (idxs_credit, expand_quantized_fn),
         (idxs_duration, expand_quantized_fn),
-        (idxs_purpose, expand_categorical)
+        (idxs_purpose, expand_categorical),
     ]
 
     return expansions, transformable_feature_idxs
 
+
 def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
-    '''Perform BFS adversarial example search to baseline against A* search.'''
+    """Perform BFS adversarial example search to baseline against A* search."""
     search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
     results = dataset_find_adversarial_examples(search_funcs=search_funcs, **kwargs)
     return results
+
 
 ###########################################
 ###########################################
@@ -124,11 +130,11 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
 # Main function.
 if __name__ == "__main__":
     # Setup a custom logger.
-    log_file = '_logging/credit_output.log'
+    log_file = "_logging/credit_output.log"
     logger = setup_custom_logger(log_file)
 
     # Define dataset location.
-    data_file = 'notebooks/data/german_credit_data.csv'
+    data_file = "notebooks/data/german_credit_data.csv"
 
     # Define the meta-experiment parameters.
     bin_counts = np.arange(5, 101, 5)
@@ -137,7 +143,7 @@ if __name__ == "__main__":
     results = []
 
     # Perform the experiments.
-    logger.info('Starting experiments for the credit fraud dataset.')
+    logger.info("Starting experiments for the credit fraud dataset.")
 
     for bins in bin_counts:
 
@@ -155,7 +161,9 @@ if __name__ == "__main__":
             random_state=SEED,
         )
 
-        result['bins'] = bins
+        result["bins"] = bins
 
         results.append(result)
-        import ipdb; ipdb.set_trace()
+        import ipdb
+
+        ipdb.set_trace()

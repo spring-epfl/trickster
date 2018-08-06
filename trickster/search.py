@@ -16,15 +16,15 @@ def _get_optimal_path(predecessors, start_node, node, hash_fn):
 
 
 def a_star_search(
-        start_node, 
-        expand_fn, 
-        goal_fn,
-        heuristic_fn=None, 
-        hash_fn=None,
-        iter_lim=None,
-        return_path=False
-    ):
-    '''
+    start_node,
+    expand_fn,
+    goal_fn,
+    heuristic_fn=None,
+    hash_fn=None,
+    iter_lim=None,
+    return_path=False,
+):
+    """
     A* search.
 
     Returns the tuple (cost, target_node) if return_path is set to False.
@@ -41,14 +41,14 @@ def a_star_search(
     :param iter_lim: Maximum number of iterations to try.
     :param return_path: Whether to return the optimal path from the
             initial node to the target node. By default equals False.
-    '''
+    """
 
     # Define default heuristic and hash functions if none given
     if heuristic_fn is None:
         heuristic_fn = lambda _: 0
     if hash_fn is None:
         hash_fn = lambda x: x
-       
+
     iter_count = 0
 
     # Define data structures to hold data
@@ -77,7 +77,8 @@ def a_star_search(
         if goal_fn(node):
             if return_path:
                 optimal_path = _get_optimal_path(
-                        predecessors, start_node, node, hash_fn)
+                    predecessors, start_node, node, hash_fn
+                )
                 return node, path_costs, optimal_path
             else:
                 return (node, path_costs[hashed_node])
@@ -95,7 +96,8 @@ def a_star_search(
             # Skip if the tentative path cost is larger or equal than the
             # recorded one (if the latter exists).
             if hashed_neighbour in path_costs and (
-                    tentative_cost >= path_costs[hashed_neighbour]):
+                tentative_cost >= path_costs[hashed_neighbour]
+            ):
                 continue
 
             # Record new path cost for the neighbour, the predecessor, and add
@@ -106,7 +108,7 @@ def a_star_search(
             reverse_hashes[hashed_neighbour] = neighbour
             if return_path:
                 predecessors[hashed_neighbour] = node
-                
+
         iter_count += 1
 
     # Goal node is unreachable.
@@ -116,8 +118,9 @@ def a_star_search(
         return None, None
 
 
-def _bounded_search_recusive(path, path_costs, bound, expand_fn,
-                             goal_fn, heuristic_fn, hash_fn, reverse_hashes):
+def _bounded_search_recusive(
+    path, path_costs, bound, expand_fn, goal_fn, heuristic_fn, hash_fn, reverse_hashes
+):
 
     # Expand the last node on the search path.
     hashed_node = path[-1]
@@ -151,7 +154,7 @@ def _bounded_search_recusive(path, path_costs, bound, expand_fn,
                 goal_fn,
                 heuristic_fn,
                 hash_fn,
-                reverse_hashes
+                reverse_hashes,
             )
 
             is_found, score, candidate_node, candidate_path = output
@@ -170,8 +173,9 @@ def _bounded_search_recusive(path, path_costs, bound, expand_fn,
     return False, min_score, None, None
 
 
-def _bounded_search(path, path_costs, bound, expand_fn,
-                    goal_fn, heuristic_fn, hash_fn, reverse_hashes):
+def _bounded_search(
+    path, path_costs, bound, expand_fn, goal_fn, heuristic_fn, hash_fn, reverse_hashes
+):
 
     # Obtain the starting node and its cost.
     hashed_node = path[-1]
@@ -186,7 +190,7 @@ def _bounded_search(path, path_costs, bound, expand_fn,
     min_score = None
 
     # Iterate while stack is not empty.
-    while len(stack): 
+    while len(stack):
 
         hashed_node, path_cost, predecessor = stack.pop()
 
@@ -221,15 +225,15 @@ def _bounded_search(path, path_costs, bound, expand_fn,
 
 
 def ida_star_search(
-        start_node, 
-        expand_fn, 
-        goal_fn,
-        heuristic_fn=None, 
-        hash_fn=None, 
-        iter_lim=None,
-        return_path=False
-    ):
-    '''
+    start_node,
+    expand_fn,
+    goal_fn,
+    heuristic_fn=None,
+    hash_fn=None,
+    iter_lim=None,
+    return_path=False,
+):
+    """
     IDA* search.
 
     Returns the tuple (cost, target_node) if return_path is set to False.
@@ -247,7 +251,7 @@ def ida_star_search(
 
     :param return_path: Whether to return the optimal path from the
             initial node to the target node. By default equals False.
-    '''
+    """
 
     # Define default heuristic and hash functions if none given.
     if heuristic_fn is None:
@@ -256,7 +260,7 @@ def ida_star_search(
         hash_fn = lambda x: x
 
     iter_count = 0
-    
+
     # Define data structures to hold data.
     path_costs = {}
     reverse_hashes = {}
@@ -280,7 +284,7 @@ def ida_star_search(
             goal_fn,
             heuristic_fn,
             hash_fn,
-            reverse_hashes
+            reverse_hashes,
         )
 
         is_found, score, candidate_node, candidate_path = output

@@ -16,11 +16,11 @@ HEURISTIC_SEARCH_FUNCS = [a_star_search, ida_star_search]
 HASH_FUNCS = [None, hash]
 
 
-@pytest.mark.parametrize('search_fn', HEURISTIC_SEARCH_FUNCS)
-@pytest.mark.parametrize('hash_fn', HASH_FUNCS)
+@pytest.mark.parametrize("search_fn", HEURISTIC_SEARCH_FUNCS)
+@pytest.mark.parametrize("hash_fn", HASH_FUNCS)
 def test_optimal_search_path(search_fn, hash_fn):
-    start_node = 'Arad'
-    goal_fn = lambda x: x == 'Bucharest'
+    start_node = "Arad"
+    goal_fn = lambda x: x == "Bucharest"
 
     goal, path_costs, optimal_path = search_fn(
         start_node=start_node,
@@ -28,17 +28,17 @@ def test_optimal_search_path(search_fn, hash_fn):
         expand_fn=expand_fn,
         goal_fn=goal_fn,
         hash_fn=hash_fn,
-        return_path=True
+        return_path=True,
     )
 
     assert OPTIMAL_PATH_FROM_ARAD == optimal_path
 
 
-@pytest.mark.parametrize('search_fn', HEURISTIC_SEARCH_FUNCS)
-@pytest.mark.parametrize('target_node', OPTIMAL_COSTS_FROM_ARAD.keys())
-@pytest.mark.parametrize('hash_fn', HASH_FUNCS)
+@pytest.mark.parametrize("search_fn", HEURISTIC_SEARCH_FUNCS)
+@pytest.mark.parametrize("target_node", OPTIMAL_COSTS_FROM_ARAD.keys())
+@pytest.mark.parametrize("hash_fn", HASH_FUNCS)
 def test_optimal_search_target_node(search_fn, target_node, hash_fn):
-    start_node = 'Arad'
+    start_node = "Arad"
     goal_fn = lambda x: x == target_node
 
     # Do not use heuristic here, since it shows distance to Bucharest.
@@ -47,18 +47,18 @@ def test_optimal_search_target_node(search_fn, target_node, hash_fn):
         expand_fn=expand_fn,
         goal_fn=goal_fn,
         hash_fn=hash_fn,
-        return_path=False
+        return_path=False,
     )
 
     assert goal == target_node
     assert cost == OPTIMAL_COSTS_FROM_ARAD[goal]
 
 
-@pytest.mark.parametrize('search_fn', HEURISTIC_SEARCH_FUNCS)
-@pytest.mark.parametrize('target_node', OPTIMAL_COSTS_FROM_ARAD.keys())
-@pytest.mark.parametrize('hash_fn', HASH_FUNCS)
+@pytest.mark.parametrize("search_fn", HEURISTIC_SEARCH_FUNCS)
+@pytest.mark.parametrize("target_node", OPTIMAL_COSTS_FROM_ARAD.keys())
+@pytest.mark.parametrize("hash_fn", HASH_FUNCS)
 def test_optimal_search_costs(search_fn, target_node, hash_fn):
-    start_node = 'Arad'
+    start_node = "Arad"
     goal_fn = lambda x: x == target_node
 
     # Do not use heuristic here, since it shows distance to Bucharest.
@@ -67,7 +67,7 @@ def test_optimal_search_costs(search_fn, target_node, hash_fn):
         expand_fn=expand_fn,
         goal_fn=goal_fn,
         hash_fn=hash_fn,
-        return_path=True
+        return_path=True,
     )
 
     for node, cost in path_costs.items():
