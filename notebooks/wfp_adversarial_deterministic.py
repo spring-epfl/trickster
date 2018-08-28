@@ -182,12 +182,12 @@ def find_adversarial(x, clf, p_norm=1, q_norm=np.inf,
         goal_fn=lambda x: _goal_fn(x, clf, target_confidence),
         heuristic_fn=lambda x: _heuristic_fn(
             x, clf, eps=eps, q_norm=q_norm, offset=offset),
-        iter_lim=int(1e5),
+        iter_lim=int(10e5),
         hash_fn=hash_fn,
         return_path=return_path
     )
 
-def find_adv_examples(X_cells, X_features, target_confidence, output_path,
+def find_adv_examples(X_cells, X_features, target_confidence, output_path=None,
                       p_norm=1, q_norm=np.inf, eps=100., offset=0.):
     """Find adversarial examples for a whole dataset"""
 
@@ -227,8 +227,9 @@ def find_adv_examples(X_cells, X_features, target_confidence, output_path,
             results.loc[i] = [original_index, True, confidence, original_confidence, x, x_adv.root,
                               real_cost, path_cost, nodes_expanded, runtime, target_confidence]
             print(results.loc[i])
-            with open(output_path, 'wb') as f:
-                pickle.dump(results, f)
+            if output_path is not None:
+                with open(output_path, 'wb') as f:
+                    pickle.dump(results, f)
 
     return results
 
@@ -247,8 +248,8 @@ def main():
     output_path = 'wfp_det_eps_%1.1f_conf_l_%1.1f.pkl' % (args.epsilon, args.confidence_level)
 
     results = find_adv_examples(
-            X_test_cell[:args.num_examples],
-            X_test_features[:args.num_examples],
+            X_train_cell[:args.num_examples],
+            X_train_features[:args.num_examples],
             args.confidence_level,
             p_norm=np.inf,
             q_norm=1,
