@@ -20,18 +20,8 @@ from defaultcontext import with_default_context
 from profiled import Profiler, profiled
 from tqdm import tqdm
 
-###########################################
-###########################################
-###########################################
-
 # Handle global variables.
 LOGGER_NAME = "adversarial"
-
-###########################################
-###########################################
-###########################################
-
-# Define useful helper functions.
 
 
 def setup_custom_logger(log_file="_logging/output.log"):
@@ -93,7 +83,12 @@ def get_feature_diff_importance(difference, transformable_feature_idxs):
 
 
 def find_substring_occurences(xs, item):
-    """Can be used to get the indexes of the required substring within a list of strings."""
+    """Can be used to get the indexes of the required substring within a list of strings.
+
+    >>> find_substring_occurences(['ab', 'bcd', 'de', 'd'])
+    [1, 2]
+
+    """
     idxs = [i for (i, x) in enumerate(xs) if item in x]
     return idxs
 
@@ -121,10 +116,6 @@ def create_reduced_classifier(clf, x, transformable_feature_idxs):
     )
     return clf_reduced
 
-
-###########################################
-###########################################
-###########################################
 
 # Define useful helper classes.
 class CounterLimitExceededError(Exception):
@@ -194,10 +185,6 @@ class Node(object):
     def __eq__(self, other):
         return self.src == other.src
 
-
-###########################################
-###########################################
-###########################################
 
 # Functions that perform adversarial example search.
 @with_default_context
