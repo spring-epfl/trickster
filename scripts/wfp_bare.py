@@ -27,7 +27,7 @@ from profiled import Profiler, profiled
 
 seed = 2018
 
-def load_data(path='./data/wfp_traces/'):
+def load_data(path):
     labels = []
     data = []
     for fn in tqdm(os.listdir(path)):
@@ -46,7 +46,7 @@ def load_data(path='./data/wfp_traces/'):
     return data, labels
 
 
-X, y = load_data(path='./data/wfp_traces_toy/')
+X, y = load_data(path='./notebooks/data/wfp_traces_toy/')
 X, y = X[:500], y[:500]
 print("Shape of data: {}, Shape of labels: {}".format(X.shape, y.shape))
 
