@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 
-import os
 import sys
 
 sys.path.append("..")
 
-# Ignore warnings.
+# We like to live dangerously.
 import warnings
 
 warnings.filterwarnings("ignore")
 
-# Handle library imports.
+import os
 import numpy as np
 import pandas as pd
 
@@ -22,17 +21,9 @@ from sklearn.linear_model import LogisticRegressionCV
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import FunctionTransformer
 
-###########################################
-###########################################
-###########################################
 
-# Handle global variables.
-SEED = 2018
+SEED = 1
 np.random.seed(seed=SEED)
-
-###########################################
-###########################################
-###########################################
 
 
 def extract_cumul(x):
@@ -111,20 +102,24 @@ def insert_dummy_packets(trace, idxs):
     return results
 
 
-def get_expansions_fn(features, **kwargs):
-    expansions = []
-    for i in features:
-        expansions.append(([i], insert_dummy_packets))
-    return expansions, None
-
-
 class TraceNode(Node):
-    def __init__(self, x, depth=0, feature_extract_fn=None):
-        if feature_extract_fn is None:
-            feature_extract_fn = extract_cumul
-        if not isinstance(x, np.ndarray):
-            x = np.array(x)
-        super().__init__(x, depth, feature_extract_fn)
+    def __init__(self, trace, depth=0):
+        super().__init__(x=list(trace), depth=depth, feature_extract_fn=extract_cumul)
+
+    def expand(self, expansions=None):
+        # Increment the counter of expanded nodes.
+        del expansions  # Unused.
+
+        counter = ExpansionCounter.get_default()
+        counter.increment()
+
+        children = []
+        for i in range(len(self.src)):
+            new_trace = insert_dummy_packets(self.src, [i])
+            if new_trace:
+                node = TraceNode(new_trace[0], depth=self.depth + 1)
+                children.append(node)
+        return children
 
 
 def example_wrapper_fn(x):
@@ -142,9 +137,25 @@ def graph_expand_fn(x):
     ]
 
     counter = ExpansionCounter.get_default()
+    if counter.count % 5 == 0:
+        print("Current depth     :", x.depth)
+        print("Branches          :", len(children))
+        print("Number of expands :", counter.count)
+        print(
+            "Cost stats        : %f / %f / %f"
+            % (min(costs), float(sum(costs)) / len(children), max(costs))
+        )
+        print()
+
     print("Expansion #", counter.count)
 
     return list(zip(children, costs))
+
+
+@profiled
+def hash_fn(x):
+    x_str = str(x.src)
+    return hash(x_str)
 
 
 def _get_normalizer():
@@ -175,21 +186,16 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
     return results
 
 
-###########################################
-###########################################
-###########################################
-
-# Main function.
 if __name__ == "__main__":
     # Setup a custom logger.
-    log_file = "_logging/credit_output.log"
+    log_file = "log/credit_output.log"
     logger = setup_custom_logger(log_file)
 
     # Define dataset location.
     data_folder = "notebooks/data/wfp_traces_toy"
 
     # Define the meta-experiment parameters.
-    p_norm, q_norm = 1, np.inf
+    p_norm, q_norm = np.inf, 1
 
     # Perform the experiments.
     logger.info("Starting experiments for the toy WFP dataset.")
@@ -197,15 +203,15 @@ if __name__ == "__main__":
         example_wrapper_fn=example_wrapper_fn,
         expand_fn=graph_expand_fn,
         heuristic_fn=graph_heuristic_fn,
+        hash_fn=hash_fn,
     )
     result = experiment_wrapper(
         load_transform_data_fn=load_transform_data_fn,
         load_kwargs=dict(path=data_folder),
         clf_fit_fn=clf_fit_fn,
         target_class=1,
-        search_kwargs=dict(p_norm=np.inf, q_norm=1.),
+        search_kwargs=dict(p_norm=p_norm, q_norm=q_norm),
         search_funcs=search_funcs,
-        get_expansions_fn=get_expansions_fn,
         baseline_dataset_find_examples_fn=baseline_detaset_find_examples_fn,
         logger=logger,
         random_state=SEED,

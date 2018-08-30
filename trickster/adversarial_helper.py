@@ -193,7 +193,7 @@ class SearchParams:
     """Parameters for a single search instance."""
 
     clf = attr.ib()
-    expansions = attr.ib()
+    expansions = attr.ib(default=attr.Factory(list))
     target_class = attr.ib(default=1)
     target_confidence = attr.ib(default=.5)
     p_norm = attr.ib(default=1)
@@ -275,10 +275,9 @@ class SearchFuncs:
 
 @profiled
 def find_adversarial_example(
-    example, search_fn, search_funcs, return_path=False, search_kwargs=None
+    example, search_fn, search_funcs, return_path=False, **kwargs
 ):
     """Transform an example until it is classified as target."""
-    search_kwargs = search_kwargs or {}
     wrapped_example = search_funcs.example_wrapper_fn(example)
     return search_fn(
         start_node=wrapped_example,
@@ -287,7 +286,7 @@ def find_adversarial_example(
         heuristic_fn=search_funcs.heuristic_fn,
         hash_fn=search_funcs.hash_fn,
         return_path=return_path,
-        **search_kwargs
+        **kwargs
     )
 
 
@@ -356,7 +355,7 @@ def dataset_find_adversarial_examples(
         real_cost, path_cost = None, None
         runtime, optimal_path = None, None
 
-        with expanded_counter.as_default(), per_example_profiler.as_default(), search_params.as_default():
+        with per_example_profiler.as_default(), expanded_counter.as_default(), search_params.as_default():
             try:
                 x_adv_reduced, path_costs, optimal_path = find_adversarial_example(
                     example=example,
@@ -372,7 +371,7 @@ def dataset_find_adversarial_examples(
                     path_cost = path_costs[search_funcs.hash_fn(x_adv_reduced)]
 
             except CounterLimitExceededError as e:
-                logger.debug("WARN! For observation at index {}: {}".format(idx, e))
+                logger.debug("WARN! For example at index {}: {}".format(idx, e))
 
         # Record some basic statistics.
         nodes_expanded = expanded_counter.count
@@ -432,7 +431,6 @@ def dataset_find_adversarial_examples(
 # Define a wrapper function to perform experiments.
 def experiment_wrapper(
     load_transform_data_fn,
-    get_expansions_fn,
     clf_fit_fn,
     target_class=1.,
     target_confidence=.5,
@@ -441,6 +439,7 @@ def experiment_wrapper(
     search_kwargs=None,
     baseline_dataset_find_examples_fn=None,
     load_kwargs=None,
+    get_expansions_fn=None,
     get_expansions_kwargs=None,
     clf_fit_kwargs=None,
     logger=None,
@@ -467,9 +466,13 @@ def experiment_wrapper(
     logger.debug("Shape of X: {}. Shape of y: {}.".format(X.shape, y.shape))
 
     # Get required expansions and sorted indexes of transformable features.
-    expansions, transformable_feature_idxs = get_expansions_fn(
-        features, **get_expansions_kwargs
-    )
+    if get_expansions_fn is None:
+        expansions = None
+        transformable_feature_idxs = None
+    else:
+        expansions, transformable_feature_idxs = get_expansions_fn(
+            features, **get_expansions_kwargs
+        )
 
     # Split into training and test sets.
     X_train, X_test, y_train, y_test = train_test_split(

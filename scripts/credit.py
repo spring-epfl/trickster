@@ -9,7 +9,6 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-# Handle library imports.
 import numpy as np
 import pandas as pd
 
@@ -18,19 +17,11 @@ from trickster.adversarial_helper import *
 from trickster.expansion import *
 from sklearn.linear_model import LogisticRegressionCV
 
-###########################################
-###########################################
-###########################################
 
-# Handle global variables.
-SEED = 2018
+SEED = 1
 np.random.seed(seed=SEED)
 
-###########################################
-###########################################
-###########################################
 
-# Define experiment helper functions.
 def load_transform_data_fn(data_file, bins, **kwargs):
     """
     Load and preprocess data, returning the examples and labels as numpy.
@@ -123,14 +114,10 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
     return results
 
 
-###########################################
-###########################################
-###########################################
-
 # Main function.
 if __name__ == "__main__":
     # Setup a custom logger.
-    log_file = "_logging/credit_output.log"
+    log_file = "log/credit_output.log"
     logger = setup_custom_logger(log_file)
 
     # Define dataset location.
@@ -146,14 +133,12 @@ if __name__ == "__main__":
     logger.info("Starting experiments for the credit fraud dataset.")
 
     for bins in bin_counts:
-
         logger.info("Loading and preprocessing input data for {} bins...".format(bins))
         result = experiment_wrapper(
             load_transform_data_fn=load_transform_data_fn,
             load_kwargs=dict(data_file=data_file, bins=bins),
             clf_fit_fn=clf_fit_fn,
             target_class=1,
-            search_fn=a_star_search,
             get_expansions_fn=get_expansions_fn,
             get_expansions_kwargs=dict(expand_quantized_fn=expand_quantized),
             baseline_dataset_find_examples_fn=baseline_detaset_find_examples_fn,
@@ -163,7 +148,6 @@ if __name__ == "__main__":
 
         result["bins"] = bins
 
-        results.append(result)
-        import ipdb
+    import ipdb
 
-        ipdb.set_trace()
+    ipdb.set_trace()
