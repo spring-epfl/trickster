@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 import sys
-sys.path.append('..')
+
+sys.path.append("..")
 
 import os
 import math
@@ -30,6 +31,7 @@ from profiled import Profiler, profiled
 
 seed = 1
 
+
 def load_data(path):
     labels = []
     data = []
@@ -49,13 +51,19 @@ def load_data(path):
     return data, labels
 
 
-X, y = load_data(path='./notebooks/data/wfp_traces_toy/')
+X, y = load_data(path="./notebooks/data/wfp_traces_toy/")
 X, y = X[:500], y[:500]
 print("Shape of data: {}, Shape of labels: {}".format(X.shape, y.shape))
 
 # Split into training and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=seed)
-print("Number train samples: {}, Number test samples: {}".format(X_train.shape[0], X_test.shape[0]))
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.1, random_state=seed
+)
+print(
+    "Number train samples: {}, Number test samples: {}".format(
+        X_train.shape[0], X_test.shape[0]
+    )
+)
 
 X_train_cell, X_train_features = zip(*X_train)
 X_test_cell, X_test_features = zip(*X_test)
@@ -63,12 +71,7 @@ X_train_cell, X_train_features = np.array(X_train_cell), np.array(X_train_featur
 X_test_cell, X_test_features = np.array(X_test_cell), np.array(X_test_features)
 
 # Fit logistic regression and perform CV
-clf = LogisticRegressionCV(
-    Cs=21,
-    cv=5,
-    n_jobs=-1,
-    random_state=seed
-)
+clf = LogisticRegressionCV(Cs=21, cv=5, n_jobs=-1, random_state=seed)
 clf.fit(X_train_features, y_train)
 
 # Get best score and C value
@@ -77,8 +80,8 @@ best_idx = np.argmax(mean_scores)
 best_score = mean_scores[best_idx]
 best_C = clf.Cs_[best_idx]
 
-print('Best score is: {:.2f}%. Best C is: {:.4f}.'.format(best_score*100, best_C))
-print('Test score is: {:.2f}%.'.format(clf.score(X_test_features, y_test)*100))
+print("Best score is: {:.2f}%. Best C is: {:.4f}.".format(best_score * 100, best_C))
+print("Test score is: {:.2f}%.".format(clf.score(X_test_features, y_test) * 100))
 
 
 def insert_dummy_packets(trace, idxs):
@@ -119,7 +122,7 @@ class BruteNode:
         return children
 
     def __repr__(self):
-        return 'BruteNode({})'.format(self.trace)
+        return "BruteNode({})".format(self.trace)
 
 
 def _expand_fn(x, p_norm=1):
@@ -130,9 +133,9 @@ def _expand_fn(x, p_norm=1):
     if not isinstance(x, BruteNode):
         x = BruteNode(trace=x, depth=0)
     children = x.expand()
-    costs = [np.linalg.norm(
-        np.array(x.features - c.features), ord=p_norm)
-             for c in children]
+    costs = [
+        np.linalg.norm(np.array(x.features - c.features), ord=p_norm) for c in children
+    ]
 
     # Poor man's logging.
     # n = ExpansionCounter.get_default().count
@@ -176,33 +179,62 @@ def hash_fn(x):
 
 
 @profiled
-def find_adversarial(x, clf, p_norm=1, q_norm=np.inf,
-                     target_confidence=0.5, eps=1.0, offset=0.,
-                     return_path=False):
+def find_adversarial(
+    x,
+    clf,
+    p_norm=1,
+    q_norm=np.inf,
+    target_confidence=0.5,
+    eps=1.0,
+    offset=0.,
+    return_path=False,
+):
     """Transform an example until it is classified with target confidence."""
 
     x = BruteNode(x)
     if clf.predict_proba([x.features])[0, 1] >= target_confidence:
-        raise Exception('Initial example is already classified as positive.')
+        raise Exception("Initial example is already classified as positive.")
     return a_star_search(
         start_node=x,
         expand_fn=lambda x: _expand_fn(x, p_norm=p_norm),
         goal_fn=lambda x: _goal_fn(x, clf, target_confidence),
         heuristic_fn=lambda x: _heuristic_fn(
-            x, clf, eps=eps, q_norm=q_norm, offset=offset),
+            x, clf, eps=eps, q_norm=q_norm, offset=offset
+        ),
         iter_lim=int(10e5),
         hash_fn=hash_fn,
-        return_path=return_path
+        return_path=return_path,
     )
 
-def find_adv_examples(X_cells, X_features, target_confidence, output_path=None,
-                      p_norm=1, q_norm=np.inf, eps=100., offset=0.):
+
+def find_adv_examples(
+    X_cells,
+    X_features,
+    target_confidence,
+    output_path=None,
+    p_norm=1,
+    q_norm=np.inf,
+    eps=100.,
+    offset=0.,
+):
     """Find adversarial examples for a whole dataset"""
 
     # Dataframe for storing the results.
     results = pd.DataFrame(
-        columns=['index', 'found', 'confidence', 'original_confidence', 'x', 'adv_x',
-                 'real_cost', 'path_cost', 'nodes_expanded', 'runtime', 'conf_level'])
+        columns=[
+            "index",
+            "found",
+            "confidence",
+            "original_confidence",
+            "x",
+            "adv_x",
+            "real_cost",
+            "path_cost",
+            "nodes_expanded",
+            "runtime",
+            "conf_level",
+        ]
+    )
 
     # Indices of examples classified as negative.
     neg_indices, = np.where(clf.predict_proba(X_features)[:, 1] < target_confidence)
@@ -216,55 +248,95 @@ def find_adv_examples(X_cells, X_features, target_confidence, output_path=None,
 
         with expanded_counter.as_default(), per_example_profiler.as_default():
             x_adv, path_cost = find_adversarial(
-                    x, clf, target_confidence=target_confidence,
-                    p_norm=p_norm, q_norm=q_norm, eps=eps, offset=offset)
+                x,
+                clf,
+                target_confidence=target_confidence,
+                p_norm=p_norm,
+                q_norm=q_norm,
+                eps=eps,
+                offset=offset,
+            )
 
         nodes_expanded = expanded_counter.count
-        runtime = per_example_profiler.compute_stats()['find_adversarial']['tot']
+        runtime = per_example_profiler.compute_stats()["find_adversarial"]["tot"]
         original_confidence = clf.predict_proba([extract(x)])[0, 1]
 
         if x_adv is None:
             # If an adversarial example was not found, only record index, runtime, and
             # the number of expanded nodes.
-            results.loc[i] = [original_index, False, None, original_confidence, x, None,
-                              None, None, nodes_expanded, runtime, target_confidence]
+            results.loc[i] = [
+                original_index,
+                False,
+                None,
+                original_confidence,
+                x,
+                None,
+                None,
+                None,
+                nodes_expanded,
+                runtime,
+                target_confidence,
+            ]
         else:
             confidence = clf.predict_proba([x_adv.features])[0, 1]
             real_cost = len(x_adv.trace) - len(x)
 
-            results.loc[i] = [original_index, True, confidence, original_confidence, x, x_adv.trace,
-                              real_cost, path_cost, nodes_expanded, runtime, target_confidence]
+            results.loc[i] = [
+                original_index,
+                True,
+                confidence,
+                original_confidence,
+                x,
+                x_adv.trace,
+                real_cost,
+                path_cost,
+                nodes_expanded,
+                runtime,
+                target_confidence,
+            ]
             print(results.loc[i])
             if output_path is not None:
-                with open(output_path, 'wb') as f:
+                with open(output_path, "wb") as f:
                     pickle.dump(results, f)
 
     return results
 
 
 def main():
-    parser = argparse.ArgumentParser(description='wfp deterministic example')
-    parser.add_argument('--confidence-level', type=float, default=0.5, metavar='N',
-                        help='confidence level for adversarial example (default: 0.5)')
-    parser.add_argument('--num-examples', type=int, default=2, metavar='N',
-                        help='number of examples')
-    parser.add_argument('--epsilon', type=int, default=1., metavar='N',
-                        help='greediness parameter')
-    parser.add_argument('--offset', type=int, default=1., metavar='N',
-                        help='heuristic offset')
+    parser = argparse.ArgumentParser(description="wfp deterministic example")
+    parser.add_argument(
+        "--confidence-level",
+        type=float,
+        default=0.5,
+        metavar="N",
+        help="confidence level for adversarial example (default: 0.5)",
+    )
+    parser.add_argument(
+        "--num-examples", type=int, default=2, metavar="N", help="number of examples"
+    )
+    parser.add_argument(
+        "--epsilon", type=int, default=1., metavar="N", help="greediness parameter"
+    )
+    parser.add_argument(
+        "--offset", type=int, default=1., metavar="N", help="heuristic offset"
+    )
     args = parser.parse_args()
-    output_path = 'wfp_det_eps_%1.1f_conf_l_%1.1f.pkl' % (args.epsilon, args.confidence_level)
+    output_path = "wfp_det_eps_%1.1f_conf_l_%1.1f.pkl" % (
+        args.epsilon,
+        args.confidence_level,
+    )
 
     results = find_adv_examples(
-            X_train_cell[:args.num_examples],
-            X_train_features[:args.num_examples],
-            args.confidence_level,
-            p_norm=np.inf,
-            q_norm=1,
-            eps=args.epsilon,
-            offset=args.offset,
-            output_path=output_path)
+        X_train_cell[: args.num_examples],
+        X_train_features[: args.num_examples],
+        args.confidence_level,
+        p_norm=np.inf,
+        q_norm=1,
+        eps=args.epsilon,
+        offset=args.offset,
+        output_path=output_path,
+    )
+
 
 if __name__ == "__main__":
     main()
-
