@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 sys.path.append('..')
 
@@ -13,6 +15,7 @@ from itertools import groupby
 from IPython.display import display, HTML
 
 from trickster.search import a_star_search
+from trickster.adversarial_helper import ExpansionCounter
 from trickster.wfp_helper import extract, load_cell
 
 from sklearn.utils import shuffle
@@ -25,7 +28,7 @@ from tqdm import tqdm
 from defaultcontext import with_default_context
 from profiled import Profiler, profiled
 
-seed = 2018
+seed = 1
 
 def load_data(path):
     labels = []
@@ -77,74 +80,77 @@ best_C = clf.Cs_[best_idx]
 print('Best score is: {:.2f}%. Best C is: {:.4f}.'.format(best_score*100, best_C))
 print('Test score is: {:.2f}%.'.format(clf.score(X_test_features, y_test)*100))
 
-@with_default_context(use_empty_init=True)
-class Counter:
-    def __init__(self):
-        self.cnt = 0
 
-    def increment(self):
-        self.cnt += 1
+def insert_dummy_packets(trace, idxs):
+    """
+    >>> insert_dummy_packets([1, -1, 1], [0])
+    [1, 1, -1, 1]
+    >>> insert_dummy_packets([1, -1, 1], [3])
+    [1, -1, 1, 1]
+    >>> insert_dummy_packets([1, -1, 1], [0, 3])
+    [1, 1, -1, 1, 1]
+    """
+    results = []
+    for i in idxs:
+        if i > 0 and trace[i - 1] == 0:
+            continue
+        extended = list(trace)
+        extended.insert(i, 1)
+        results.append(extended)
+    return results
 
-    def count(self):
-        return self.cnt
-
-# Define `BruteNode` class transformation code:
-# If at level i a node contains an input of length n, there will be n+1 branches at
-# level i+1 with a new request at every possible index.
 
 class BruteNode:
-    def __init__(self, x, level=0):
-        if isinstance(x, BruteNode):
-            self.root = x.root
-            self.features = x.features
-            self.level = x.level
-        else:
-            self.root = list(x)
-            self.features = np.array(extract(self.root))
-            self.level = level
+    def __init__(self, trace, depth=0):
+        self.trace = list(trace)
+        self.features = np.array(extract(self.trace))
+        self.depth = depth
 
     def expand(self):
         # Increment the counter of expanded nodes.
-        counter = Counter.get_default()
+        counter = ExpansionCounter.get_default()
         counter.increment()
 
         children = []
-        for idx in range(len(self.root) + 1):
-            expanded_node = BruteNode(self.root[:idx] + [1] + self.root[idx:],\
-                                      level=self.level+1)
-            children.append(expanded_node)
+        for i in range(len(self.trace)):
+            trace = insert_dummy_packets(self.trace, [i])[0]
+            node = BruteNode(trace, depth=self.depth + 1)
+            children.append(node)
         return children
 
     def __repr__(self):
-        return 'BruteNode({})'.format(self.root)
+        return 'BruteNode({})'.format(self.trace)
 
-# All the functions that need to be passed into the search, in the expected format.
 
 def _expand_fn(x, p_norm=1):
     """Wrap the example in `Node`, expand the node, and compute the costs.
 
     Returns a list of tuples (child, cost)
     """
-    children = BruteNode(x).expand()
+    if not isinstance(x, BruteNode):
+        x = BruteNode(trace=x, depth=0)
+    children = x.expand()
     costs = [np.linalg.norm(
         np.array(x.features - c.features), ord=p_norm)
              for c in children]
 
     # Poor man's logging.
-    n = Counter().get_default().count()
-    if n % 5 == 0:
-        print('Current level     :', x.level)
-        print('Branches          :', len(children))
-        print('Number of expands :', n)
-        print('Cost stats        : %f / %f / %f' % (
-            min(costs), float(sum(costs)) / len(children), max(costs)))
-        print()
+    # n = ExpansionCounter.get_default().count
+    # if n % 5 == 0:
+    #     print('Current depth     :', x.depth)
+    #     print('Branches          :', len(children))
+    #     print('Number of expands :', n)
+    #     print('Cost stats        : %f / %f / %f' % (
+    #         min(costs), float(sum(costs)) / len(children), max(costs)))
+    #     print()
 
     return list(zip(children, costs))
+
 
 def _goal_fn(x, clf, target_confidence=0.5):
     """Tell whether the example has reached the goal."""
     return clf.predict_proba([x.features])[0, 1] >= target_confidence
+
 
 def _heuristic_fn(x, clf, q_norm=np.inf, eps=1., offset=0):
     """Distance to the decision boundary of a logistic regression classifier.
@@ -162,10 +168,12 @@ def _heuristic_fn(x, clf, q_norm=np.inf, eps=1., offset=0):
     h = np.abs(score) / np.linalg.norm(clf.coef_, ord=q_norm)
     return eps * (h + offset)
 
+
 def hash_fn(x):
     """Hash function for examples."""
-    x_str = str(x.root)
+    x_str = str(x.trace)
     return hash(x_str)
+
 
 @profiled
 def find_adversarial(x, clf, p_norm=1, q_norm=np.inf,
@@ -203,7 +211,7 @@ def find_adv_examples(X_cells, X_features, target_confidence, output_path=None,
         x = X_cells[original_index]
 
         # Instantiate a counter for expanded nodes, and a profiler.
-        expanded_counter = Counter()
+        expanded_counter = ExpansionCounter()
         per_example_profiler = Profiler()
 
         with expanded_counter.as_default(), per_example_profiler.as_default():
@@ -211,7 +219,7 @@ def find_adv_examples(X_cells, X_features, target_confidence, output_path=None,
                     x, clf, target_confidence=target_confidence,
                     p_norm=p_norm, q_norm=q_norm, eps=eps, offset=offset)
 
-        nodes_expanded = expanded_counter.count()
+        nodes_expanded = expanded_counter.count
         runtime = per_example_profiler.compute_stats()['find_adversarial']['tot']
         original_confidence = clf.predict_proba([extract(x)])[0, 1]
 
@@ -222,9 +230,9 @@ def find_adv_examples(X_cells, X_features, target_confidence, output_path=None,
                               None, None, nodes_expanded, runtime, target_confidence]
         else:
             confidence = clf.predict_proba([x_adv.features])[0, 1]
-            real_cost = len(x_adv.root) - len(x)
+            real_cost = len(x_adv.trace) - len(x)
 
-            results.loc[i] = [original_index, True, confidence, original_confidence, x, x_adv.root,
+            results.loc[i] = [original_index, True, confidence, original_confidence, x, x_adv.trace,
                               real_cost, path_cost, nodes_expanded, runtime, target_confidence]
             print(results.loc[i])
             if output_path is not None:
