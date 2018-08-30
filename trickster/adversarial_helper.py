@@ -24,7 +24,7 @@ from tqdm import tqdm
 LOGGER_NAME = "adversarial"
 
 
-def setup_custom_logger(log_file="_logging/output.log"):
+def setup_custom_logger(log_file="log/output.log"):
     """Set up a logger object to print info to stdout and debug to file."""
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(logging.DEBUG)
