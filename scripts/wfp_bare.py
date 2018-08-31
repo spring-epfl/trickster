@@ -43,9 +43,8 @@ class Datasets:
     y_test = attr.ib()
 
 
-def prepare_data(data_path="notebooks/data/wfp_traces_toy/"):
-    X, y = load_data(path=data_path)
-    X, y = X[:500], y[:500]
+def prepare_data(data_path="notebooks/data/wfp_traces_toy/", max_len=None):
+    X, y = load_data(path=data_path, max_len=max_len)
     print("Shape of data: {}, Shape of labels: {}".format(X.shape, y.shape))
 
     # Split into training and test sets
@@ -173,6 +172,18 @@ def expand_fn(x):
         for c in children
     ]
 
+    # Poor man's logging.
+    n = ExpansionCounter().get_default().count
+    if n % 10 == 0:
+        print("Current depth     :", x.depth)
+        print("Branches          :", len(children))
+        print("Number of expands :", n)
+        print(
+            "Cost stats        : %f / %f / %f"
+            % (min(costs), float(sum(costs)) / len(children), max(costs))
+        )
+        print()
+
     return list(zip(children, costs))
 
 
@@ -183,16 +194,19 @@ def hash_fn(x):
 
 
 def run_wfp_experiment(
+    data_path,
     target_confidence,
     output_path=None,
     p_norm=1,
     q_norm=np.inf,
     epsilon=1.,
+    max_trace_len=None,
+    iter_lim=None,
     max_num_examples=None,
 ):
     """Find adversarial examples for a whole dataset"""
 
-    datasets = prepare_data()
+    datasets = prepare_data(data_path, max_len=max_trace_len)
     clf = fit_model(datasets)
 
     # Dataframe for storing the results.
@@ -232,14 +246,14 @@ def run_wfp_experiment(
 
     # Indices of examples classified as negative.
     neg_indices, = np.where(
-        clf.predict_proba(datasets.X_train_features)[:, 1] < target_confidence
+        clf.predict_proba(datasets.X_test_features)[:, 1] < target_confidence
     )
     num_adv_examples_found = 0
     for i, original_index in enumerate(tqdm(neg_indices)):
         if max_num_examples is not None and num_adv_examples_found > max_num_examples:
             break
 
-        x = datasets.X_train_cell[original_index]
+        x = datasets.X_test_cell[original_index]
 
         # Instantiate a counter for expanded nodes, and a profiler.
         expanded_counter = ExpansionCounter()
@@ -248,7 +262,9 @@ def run_wfp_experiment(
         per_example_profiler = Profiler()
         Profiler.set_global_default(per_example_profiler)
 
-        x_adv, path_cost = find_adversarial_example(x, a_star_search, search_funcs)
+        x_adv, path_cost = find_adversarial_example(
+            x, a_star_search, search_funcs, iter_lim=iter_lim
+        )
 
         nodes_expanded = expanded_counter.count
         runtime = per_example_profiler.compute_stats()["find_adversarial_example"][
@@ -291,37 +307,51 @@ def run_wfp_experiment(
                 runtime,
                 target_confidence,
             ]
-            print(results.loc[i])
             if output_path is not None:
                 with open(output_path, "wb") as f:
                     pickle.dump(results, f)
+
+        print(results.loc[i])
 
     return results
 
 
 def main():
-    parser = argparse.ArgumentParser(description="wfp deterministic example")
+    parser = argparse.ArgumentParser(
+        description="Generate adversarial examples for WFP"
+    )
     parser.add_argument(
         "--confidence-level",
         type=float,
         default=0.5,
-        metavar="N",
         help="target confidence level for adversarial example",
     )
     parser.add_argument(
-        "--num-examples", type=int, default=2, metavar="N", help="number of examples"
+        "--num-examples", type=int, default=None, help="number of examples"
     )
     parser.add_argument(
-        "--epsilon", type=int, default=1., metavar="N", help="greediness parameter"
+        "--iter-lim", type=int, default=1000, help="max number of search iterations"
     )
-    parser.add_argument("--output", help="path to output pickled dataframe")
+    parser.add_argument("--epsilon", type=int, default=1., help="greediness parameter")
+    parser.add_argument(
+        "--output", default=None, help="path to output pickled dataframe"
+    )
+    parser.add_argument(
+        "--data-path", default="data/knndata/", help="path to input traces"
+    )
+    parser.add_argument(
+        "--max-trace-len", type=int, default=None, help="max trace length"
+    )
     args = parser.parse_args()
 
     results = run_wfp_experiment(
-        args.confidence_level,
+        data_path=args.data_path,
+        target_confidence=args.confidence_level,
         p_norm=np.inf,
         q_norm=1,
         epsilon=args.epsilon,
+        iter_lim=args.iter_lim,
+        max_trace_len=args.max_trace_len,
         output_path=args.output,
         max_num_examples=args.num_examples,
     )
