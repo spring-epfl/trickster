@@ -342,7 +342,8 @@ def main():
         "--data-path", default="data/knndata/", help="path to input traces"
     )
     parser.add_argument(
-        "--max-trace-len", type=int, default=None, help="max trace length"
+        # 6746 is 95-th percentile on the knndata.
+        "--max-trace-len", type=int, default=6745, help="max trace length"
     )
     args = parser.parse_args()
 
