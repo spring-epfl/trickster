@@ -12,3 +12,4 @@ venv
 .eggs
 
 data/knndata
+.tmp
