@@ -340,7 +340,7 @@ def main():
         "--data-path", default="data/knndata/", help="path to input traces"
     )
     parser.add_argument(
-        "--max-trace-len", type=int, default=500, help="max trace length"
+        "--max-trace-len", type=int, default=None, help="max trace length"
     )
     args = parser.parse_args()
 
