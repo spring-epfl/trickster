@@ -43,9 +43,8 @@ class Datasets:
     y_test = attr.ib()
 
 
-def prepare_data(data_path="notebooks/data/wfp_traces_toy/", max_len=None):
+def prepare_data(data_path, max_len=None):
     X, y = load_data(path=data_path, max_len=max_len)
-    print("Shape of data: {}, Shape of labels: {}".format(X.shape, y.shape))
 
     # Split into training and test sets
     X_train, X_test, y_train, y_test = train_test_split(
@@ -61,6 +60,16 @@ def prepare_data(data_path="notebooks/data/wfp_traces_toy/", max_len=None):
     X_test_cell, X_test_features = zip(*X_test)
     X_train_cell, X_train_features = np.array(X_train_cell), np.array(X_train_features)
     X_test_cell, X_test_features = np.array(X_test_cell), np.array(X_test_features)
+    print(
+        "Shape of (training) feature dataset: {}, shape of labels: {}".format(
+            X_train_features.shape, y_train.shape
+        )
+    )
+    print(
+        "Shape of (testing) feature dataset : {}, shape of labels: {}".format(
+            X_test_features.shape, y_test.shape
+        )
+    )
 
     return Datasets(
         X_train_cell=X_train_cell,
@@ -75,16 +84,9 @@ def prepare_data(data_path="notebooks/data/wfp_traces_toy/", max_len=None):
 def fit_model(datasets):
     """Train the target model."""
     # Fit logistic regression and perform CV
-    clf = LogisticRegressionCV(Cs=21, cv=5, n_jobs=-1, random_state=SEED)
+    clf = LogisticRegressionCV(Cs=21, cv=5, n_jobs=-1, penalty="l2", random_state=SEED)
     clf.fit(datasets.X_train_features, datasets.y_train)
 
-    # Get best score and C value
-    mean_scores = np.mean(clf.scores_[1], axis=0)
-    best_idx = np.argmax(mean_scores)
-    best_score = mean_scores[best_idx]
-    best_C = clf.Cs_[best_idx]
-
-    print("Best score is: {:.2f}%. Best C is: {:.4f}.".format(best_score * 100, best_C))
     print(
         "Test score is: {:.2f}%.".format(
             clf.score(datasets.X_test_features, datasets.y_test) * 100
