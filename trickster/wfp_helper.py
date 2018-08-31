@@ -64,7 +64,7 @@ def extract(packet_sizes):
     return features
 
 
-def load_cell_data(filename, time=0, ext=".cell", max_len=-1):
+def load_cell_data(filename, time=0, ext=".cell", max_len=None):
     """Load cell data from file.
 
     :param time: If zero, don't load packet times (saves time and memoty).
@@ -125,7 +125,7 @@ def load_cell_data(filename, time=0, ext=".cell", max_len=-1):
     except:
         raise Exception("Could not load cell data in %s" % filename)
 
-    if max_len == -1:
+    if max_len is None:
         return data
     else:
         return data[:max_len]
@@ -160,14 +160,14 @@ def reverse_onehot(arr, trace_len):
     return f
 
 
-def load_data(path):
+def load_data(path, *args, **kwargs):
     """Load traces from a folder."""
     labels = []
     data = []
     for filename in tqdm(os.listdir(path)):
-        file_path = path + filename
+        file_path = os.path.join(path, filename)
         if os.path.isfile(file_path):
-            cell_list = load_cell_data(file_path)
+            cell_list = load_cell_data(file_path, *args, **kwargs)
             feature_list = extract(cell_list)
             if "-" in str(filename):
                 labels.append(1)
