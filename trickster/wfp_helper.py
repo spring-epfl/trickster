@@ -1,7 +1,7 @@
 import os
 import sys
+
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm
 
 
@@ -137,35 +137,6 @@ def load_cell_data(filename, time=0, ext=".cell", max_len=None):
         return data[:max_len]
 
 
-def one_hot_to_indices(data):
-    indices = []
-    for el in data:
-        indices.append(list(el).index(1))
-    return indices
-
-
-def pad_and_onehot(data):
-    max_trace_len = len(max([x for x in data], key=len)) + 200
-    data = [np.pad(x, (0, max_trace_len - len(x)), "constant") for x in data]
-    data = onehot(data)
-    return max_trace_len, np.array(data)
-
-
-def onehot(data):
-    data_ = []
-    for d in data:
-        b = np.zeros((len(d), 3))
-        b[np.arange(len(d)), d] = 1
-        data_.append(b.flatten())
-    return data_
-
-
-def reverse_onehot(arr, trace_len):
-    f = np.argmax(np.reshape(arr, (trace_len, 3)), axis=1)
-    f[f == 2] = -1
-    return f
-
-
 def load_data(path, *args, **kwargs):
     """Load traces from a folder."""
     labels = []
@@ -186,10 +157,79 @@ def load_data(path, *args, **kwargs):
     return data, labels
 
 
-def insert_dummy_packets(trace, index, num_dummies=1):
+def pad_and_onehot(data, pad_len=None, extra_padding=200):
+    """Pad and one-hot encode traces.
+
+    See :py:func:`onehot`.
+
+    :param data: A list or array of traces.
+    :param pad_len: Number of packets to pad to. If ``None``, pad to
+            the max trace length.
+    :param extra_padding: Extra padding.
+
+    >>> pad_and_onehot([[1, 1, -1]], pad_len=4, extra_padding=0)
+    (4, array([[0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0]]))
+
+            ^1st     ^2nd     ^3rd     ^pad
     """
+    if pad_len is None:
+        pad_len = max(len(x) for x in data) + extra_padding
+    data = [
+        onehot(np.pad(trace, (0, pad_len - len(trace)), mode="constant"))
+        for trace in data
+    ]
+    return pad_len, np.array(data)
+
+
+def onehot(trace):
+    """One-hot encode a single trace.
+
+    Each packet in the trace corresponds to three categories: none, outgoing, or ingoing.
+    This encoding procedure one-hot encodes each position. This results in the binary
+    vector of length ``3 * len(trace)`` for each trace.
+
+    :param trace: Trace
+
+    >>> onehot([1, -1])
+    array([0, 1, 0, 0, 0, 1])
+    """
+    encoded_trace = np.zeros((len(trace), 3), dtype=int)
+    encoded_trace[np.arange(len(trace)), trace] = 1
+    return encoded_trace.flatten()
+
+
+def reverse_onehot(encoded_trace, trace_len=None):
+    """Reverse a single one-hot encoded trace.
+
+    See :py:func:`onehot`.
+
+    :param encoded_trace: One-hot encoded trace
+    :param trace_len: Length of the original trace
+
+    >>> encoded_trace = np.array([0, 1, 0, 0, 0, 1])
+    >>> reverse_onehot(encoded_trace)
+    array([ 1, -1])
+    """
+    if trace_len is None:
+        trace_len = len(encoded_trace) // 3
+    raw_trace = np.argmax(np.reshape(encoded_trace, (trace_len, 3)), axis=1)
+    raw_trace[raw_trace == 2] = -1
+    return raw_trace
+
+
+def insert_dummy_packets(trace, index, num_dummies=1):
+    """Insert dummy packets to the trace at a given position.
+
+    :param trace: Trace
+    :param index: Index before which to insert the packets
+    :param num_dummies: Number of dummy packets to insert
+
     >>> insert_dummy_packets([1, -1, 1], 0)
     [1, 1, -1, 1]
+    >>> insert_dummy_packets([1, -1, 1], 1)
+    [1, 1, -1, 1]
+    >>> insert_dummy_packets([1, -1, 1], 2)
+    [1, -1, 1, 1]
     >>> insert_dummy_packets([1, -1, 1], 3)
     [1, -1, 1, 1]
     >>> insert_dummy_packets([1, -1, 1], 0, num_dummies=2)
@@ -199,4 +239,3 @@ def insert_dummy_packets(trace, index, num_dummies=1):
         return None
     extended = trace[:index] + [1] * num_dummies + trace[index:]
     return extended
-
