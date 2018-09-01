@@ -18,6 +18,7 @@ from trickster.adversarial_helper import ExpansionCounter
 from trickster.adversarial_helper import SearchParams, SearchFuncs
 from trickster.adversarial_helper import find_adversarial_example
 from trickster.wfp_helper import extract, load_data
+from trickster.wfp_helper import insert_dummy_packets
 
 from tqdm import tqdm
 from sklearn.utils import shuffle
@@ -96,30 +97,12 @@ def fit_model(datasets):
     return clf
 
 
-def insert_dummy_packets(trace, idxs):
-    """
-    >>> insert_dummy_packets([1, -1, 1], [0])
-    [1, 1, -1, 1]
-    >>> insert_dummy_packets([1, -1, 1], [3])
-    [1, -1, 1, 1]
-    >>> insert_dummy_packets([1, -1, 1], [0, 3])
-    [1, 1, -1, 1, 1]
-    """
-    results = []
-    for i in idxs:
-        if i > 0 and trace[i - 1] == 0:
-            continue
-        extended = list(trace)
-        extended.insert(i, 1)
-        results.append(extended)
-    return results
-
-
 class TraceNode:
-    def __init__(self, trace, depth=0):
+    def __init__(self, trace, depth=0, dummies_per_insertion=1):
         self.trace = list(trace)
         self.features = np.array(extract(self.trace))
         self.depth = depth
+        self.dummies_per_insertion = dummies_per_insertion
 
     def expand(self):
         # Increment the counter of expanded nodes.
@@ -128,7 +111,7 @@ class TraceNode:
 
         children = []
         for i in range(len(self.trace)):
-            trace = insert_dummy_packets(self.trace, [i])[0]
+            trace = insert_dummy_packets(self.trace, i, self.dummies_per_insertion)
             node = TraceNode(trace, depth=self.depth + 1)
             children.append(node)
         return children
@@ -205,6 +188,7 @@ def run_wfp_experiment(
     max_trace_len=None,
     iter_lim=None,
     max_num_examples=None,
+    dummies_per_insertion=1
 ):
     """Find adversarial examples for a whole dataset"""
 
@@ -238,8 +222,10 @@ def run_wfp_experiment(
     )
     SearchParams.set_global_default(search_params)
 
+    node_params = dict(dummies_per_insertion=dummies_per_insertion)
+
     search_funcs = SearchFuncs(
-        example_wrapper_fn=lambda example: TraceNode(example),
+        example_wrapper_fn=lambda example: TraceNode(example, **node_params),
         expand_fn=expand_fn,
         goal_fn=goal_fn,
         heuristic_fn=heuristic_fn,
@@ -323,27 +309,30 @@ def main():
         description="Generate adversarial examples for WFP"
     )
     parser.add_argument(
-        "--confidence-level",
+        "--confidence_level",
         type=float,
         default=0.5,
         help="target confidence level for adversarial example",
     )
     parser.add_argument(
-        "--num-examples", type=int, default=None, help="number of examples"
+        "--num_examples", type=int, default=None, help="number of examples"
     )
     parser.add_argument(
-        "--iter-lim", type=int, default=1000, help="max number of search iterations"
+        "--iter_lim", type=int, default=1000, help="max number of search iterations"
     )
     parser.add_argument("--epsilon", type=int, default=1., help="greediness parameter")
     parser.add_argument(
         "--output", default=None, help="path to output pickled dataframe"
     )
     parser.add_argument(
-        "--data-path", default="data/knndata/", help="path to input traces"
+        "--data_path", default="data/knndata/", help="path to input traces"
     )
     parser.add_argument(
         # 6746 is 95-th percentile on the knndata.
-        "--max-trace-len", type=int, default=6745, help="max trace length"
+        "--max_trace_len", type=int, default=6745, help="max trace length"
+    )
+    parser.add_argument(
+        "--dummies_per_insertion", type=int, default=3, help="number of dummy packets per insersion"
     )
     args = parser.parse_args()
 
@@ -357,6 +346,7 @@ def main():
         max_trace_len=args.max_trace_len,
         output_path=args.output,
         max_num_examples=args.num_examples,
+        dummies_per_insertion=args.dummies_per_insertion
     )
 
 
