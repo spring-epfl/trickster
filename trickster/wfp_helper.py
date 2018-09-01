@@ -9,6 +9,12 @@ def extract(packet_sizes):
     """Extract CUMUL features.
 
     :param packet_sizes: (Signed) list of packet sizes
+
+    >>> cumul_vector = extract([1, 1, -1, -1, -1])
+    >>> len(cumul_vector)
+    104
+    >>> cumul_vector[:4]
+    array([3., 2., 3., 2.])
     """
 
     # First 4 features.
@@ -61,7 +67,7 @@ def extract(packet_sizes):
 
         features.append(sample_y)
 
-    return features
+    return np.array(features)
 
 
 def load_cell_data(filename, time=0, ext=".cell", max_len=None):
@@ -178,3 +184,19 @@ def load_data(path, *args, **kwargs):
     labels = np.array(labels)
     data = np.array(data)
     return data, labels
+
+
+def insert_dummy_packets(trace, index, num_dummies=1):
+    """
+    >>> insert_dummy_packets([1, -1, 1], 0)
+    [1, 1, -1, 1]
+    >>> insert_dummy_packets([1, -1, 1], 3)
+    [1, -1, 1, 1]
+    >>> insert_dummy_packets([1, -1, 1], 0, num_dummies=2)
+    [1, 1, 1, -1, 1]
+    """
+    if index > 0 and trace[index - 1] == 0:
+        return None
+    extended = trace[:index] + [1] * num_dummies + trace[index:]
+    return extended
+
