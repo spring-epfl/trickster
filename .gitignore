@@ -13,3 +13,6 @@ venv
 
 data/knndata
 .tmp
+
+log/*
+!log/.gitkeep

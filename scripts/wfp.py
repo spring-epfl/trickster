@@ -9,6 +9,7 @@ import os
 import math
 import pickle
 import argparse
+import logging
 
 import attr
 import click
@@ -19,6 +20,8 @@ from trickster.search import a_star_search
 from trickster.adversarial_helper import ExpansionCounter
 from trickster.adversarial_helper import SearchParams, SearchFuncs
 from trickster.adversarial_helper import find_adversarial_example
+from trickster.adversarial_helper import setup_custom_logger
+from trickster.adversarial_helper import LOGGER_NAME
 from trickster.wfp_helper import extract, pad_and_onehot, load_data
 from trickster.wfp_helper import insert_dummy_packets
 from trickster.utils.cli import add_options
@@ -37,6 +40,18 @@ SEED = 1
 np.random.seed(seed=SEED)
 
 DEBUG_PLOT_FREQ = 50
+
+
+@with_default_context
+class Logger:
+    def __init__(self, log_file):
+        self._logger = setup_custom_logger(log_file)
+
+    def info(self, *args, **kwargs):
+        self._logger.info(*args, **kwargs)
+
+    def debug(self, *args, **kwargs):
+        self._logger.debug(*args, **kwargs)
 
 
 @attr.s
@@ -58,7 +73,9 @@ def prepare_data(data_path, features="cumul", max_len=None):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.1, random_state=SEED
     )
-    print(
+
+    logger = Logger.get_default()
+    logger.info(
         "Number of train samples: {}, Number test samples: {}".format(
             X_train.shape[0], X_test.shape[0]
         )
@@ -73,8 +90,8 @@ def prepare_data(data_path, features="cumul", max_len=None):
         pad_len, X_train_features = pad_and_onehot(X_train, pad_len=max_len)
         _, X_test_features = pad_and_onehot(X_test, pad_len=pad_len)
 
-    print("Train features shape:", X_train_features.shape)
-    print("Test features shape:", X_test_features.shape)
+    logger.info("Train features shape: {}".format(X_train_features.shape))
+    logger.info("Test features shape: {}".format(X_test_features.shape))
 
     return Datasets(
         X_train_cell=X_train,
@@ -91,7 +108,8 @@ def fit_logistic_regression_model(datasets):
     clf = LogisticRegressionCV(Cs=21, cv=5, n_jobs=-1, penalty="l2", random_state=SEED)
     clf.fit(datasets.X_train_features, datasets.y_train)
 
-    print(
+    logger = Logger.get_default()
+    logger.info(
         "Test score is: {:.2f}%.".format(
             clf.score(datasets.X_test_features, datasets.y_test) * 100
         )
@@ -223,14 +241,15 @@ def expand_fn(x):
     # Poor man's logging.
     n = ExpansionCounter().get_default().count
     if n % DEBUG_PLOT_FREQ == 0:
-        print("Current depth     :", x.depth)
-        print("Branches          :", len(children))
-        print("Number of expands :", n)
-        print(
+        logger = Logger.get_default()
+        logger.debug("Current depth     : %i" % x.depth)
+        logger.debug("Branches          : %i" % len(children))
+        logger.debug("Number of expands : %i" % n)
+        logger.debug(
             "Cost stats        : %f / %f / %f"
             % (min(costs), float(sum(costs)) / len(children), max(costs))
         )
-        print()
+        logger.debug("---")
 
     return list(zip(children, costs))
 
@@ -255,8 +274,12 @@ def run_wfp_experiment(
     max_num_examples=None,
     dummies_per_insertion=1,
     output_pickle=None,
+    log_file=None,
 ):
     """Find adversarial examples for a dataset"""
+    logger = Logger(log_file)
+    Logger.set_global_default(logger)
+
     clf = pickle.load(model_pickle)
     datasets = prepare_data(data_path, features=features, max_len=max_trace_len)
 
@@ -366,13 +389,10 @@ def run_wfp_experiment(
                 target_confidence,
             ]
 
-        import ipdb
-
-        ipdb.set_trace()
         if output_pickle is not None:
             pickle.dump(results, output_pickle)
 
-        print(results.loc[i])
+        logger.debug(results.loc[i])
 
     return results
 
@@ -381,18 +401,21 @@ common_options = [
     click.option(
         "--data_path",
         default="data/knndata",
-        type=click.Path(exists=True),
+        show_default=True,
+        type=click.Path(exists=True, file_okay=False),
         help="Path to knndata traces.",
     ),
     click.option(
         "--features",
         default="raw",
+        show_default=True,
         type=click.Choice(["raw", "cumul"]),
         help="Feature extraction.",
     ),
     click.option(
         "--max_trace_len",
         default=6746,
+        show_default=True,
         type=int,
         help="Number of packets to cut traces to.",
     ),
@@ -430,21 +453,31 @@ def train(data_path, features, max_trace_len, model_pickle):
 @click.option(
     "--model_pickle", type=click.File("rb"), help="Pickled model path.", required=True
 )
-@click.option("--confidence_level", default=0.5, help="Target confidence level.")
+@click.option(
+    "--confidence_level",
+    default=0.5,
+    show_default=True,
+    help="Target confidence level.",
+)
 @click.option("--num_examples", help="Number of adversarial examples to generate.")
 @click.option(
     "--iter_lim",
     default=10000,
+    show_default=True,
     help="Max number of search iterations until before giving up.",
 )
 @click.option(
     "--dummies_per_insertion",
     default=1,
+    show_default=True,
     help="Number of dummy packets to insert for each transformation.",
 )
-@click.option("--epsilon", default=1, help="The more the greedier.")
+@click.option("--epsilon", default=1, show_default=True, help="The more the greedier.")
 @click.option(
-    "--output_pickle", type=click.File("wb"), help="The more the greedier."
+    "--output_pickle", type=click.File("wb"), help="Output results dataframe pickle."
+)
+@click.option(
+    "--log_file", default="log/wfp.log", type=click.Path(), help="Log file path."
 )
 def generate(
     data_path,
@@ -457,6 +490,7 @@ def generate(
     dummies_per_insertion,
     epsilon,
     output_pickle,
+    log_file,
 ):
     """Generate adversarial examples."""
     run_wfp_experiment(
@@ -472,9 +506,9 @@ def generate(
         max_num_examples=num_examples,
         dummies_per_insertion=dummies_per_insertion,
         output_pickle=output_pickle,
+        log_file=log_file,
     )
 
 
 if __name__ == "__main__":
     cli()
-
