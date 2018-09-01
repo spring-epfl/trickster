@@ -85,7 +85,7 @@ def get_feature_diff_importance(difference, transformable_feature_idxs):
 def find_substring_occurences(xs, item):
     """Can be used to get the indexes of the required substring within a list of strings.
 
-    >>> find_substring_occurences(['ab', 'bcd', 'de', 'd'])
+    >>> find_substring_occurences(['ab', 'bcd', 'de'], 'd')
     [1, 2]
 
     """
