@@ -42,18 +42,6 @@ np.random.seed(seed=SEED)
 DEBUG_PLOT_FREQ = 50
 
 
-@with_default_context
-class Logger:
-    def __init__(self, log_file):
-        self._logger = setup_custom_logger(log_file)
-
-    def info(self, *args, **kwargs):
-        self._logger.info(*args, **kwargs)
-
-    def debug(self, *args, **kwargs):
-        self._logger.debug(*args, **kwargs)
-
-
 @attr.s
 class Datasets:
     X_train_cell = attr.ib()
@@ -74,7 +62,7 @@ def prepare_data(data_path, features="cumul", max_len=None):
         X, y, test_size=0.1, random_state=SEED
     )
 
-    logger = Logger.get_default()
+    logger = logging.getLogger(LOGGER_NAME)
     logger.info(
         "Number of train samples: {}, Number test samples: {}".format(
             X_train.shape[0], X_test.shape[0]
@@ -108,7 +96,7 @@ def fit_logistic_regression_model(datasets):
     clf = LogisticRegressionCV(Cs=21, cv=5, n_jobs=-1, penalty="l2", random_state=SEED)
     clf.fit(datasets.X_train_features, datasets.y_train)
 
-    logger = Logger.get_default()
+    logger = logging.getLogger(LOGGER_NAME)
     logger.info(
         "Test score is: {:.2f}%.".format(
             clf.score(datasets.X_test_features, datasets.y_test) * 100
@@ -241,7 +229,7 @@ def expand_fn(x):
     # Poor man's logging.
     n = ExpansionCounter().get_default().count
     if n % DEBUG_PLOT_FREQ == 0:
-        logger = Logger.get_default()
+        logger = logging.getLogger(LOGGER_NAME)
         logger.debug("Current depth     : %i" % x.depth)
         logger.debug("Branches          : %i" % len(children))
         logger.debug("Number of expands : %i" % n)
@@ -277,8 +265,7 @@ def run_wfp_experiment(
     log_file=None,
 ):
     """Find adversarial examples for a dataset"""
-    logger = Logger(log_file)
-    Logger.set_global_default(logger)
+    logger = setup_custom_logger(log_file)
 
     clf = pickle.load(model_pickle)
     datasets = prepare_data(data_path, features=features, max_len=max_trace_len)
