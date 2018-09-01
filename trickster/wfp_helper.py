@@ -5,10 +5,10 @@ import numpy as np
 from tqdm import tqdm
 
 
-def extract(packet_sizes):
-    """Extract CUMUL features.
+def extract(trace):
+    """Extract CUMUL features from a single trace.
 
-    :param packet_sizes: (Signed) list of packet sizes
+    :param trace: (Signed) list of packet sizes
 
     >>> cumul_vector = extract([1, 1, -1, -1, -1])
     >>> len(cumul_vector)
@@ -23,12 +23,12 @@ def extract(packet_sizes):
     inpacket = 0
     outpacket = 0
 
-    for i in range(0, len(packet_sizes)):
-        if packet_sizes[i] > 0:
-            outsize += packet_sizes[i]
+    for i in range(0, len(trace)):
+        if trace[i] > 0:
+            outsize += trace[i]
             outpacket += 1
         else:
-            insize += abs(packet_sizes[i])
+            insize += abs(trace[i])
             inpacket += 1
     features = [insize, outsize, inpacket, outpacket]
 
@@ -37,7 +37,7 @@ def extract(packet_sizes):
     x = 0  # Sum of absolute packet sizes.
     y = 0  # Sum of packet sizes.
     graph = []
-    for packet_size in packet_sizes:
+    for packet_size in trace:
         x += abs(packet_size)
         y += packet_size
         graph.append([x, y])
@@ -145,13 +145,9 @@ def load_data(path, *args, **kwargs):
         file_path = os.path.join(path, filename)
         if os.path.isfile(file_path):
             cell_list = load_cell_data(file_path, *args, **kwargs)
-            feature_list = extract(cell_list)
-            if "-" in str(filename):
-                labels.append(1)
-                data.append((cell_list, feature_list))
-            else:
-                labels.append(0)
-                data.append((cell_list, feature_list))
+            label = 1 if "-" in str(filename) else 0
+            data.append(cell_list)
+            labels.append(label)
     labels = np.array(labels)
     data = np.array(data)
     return data, labels
