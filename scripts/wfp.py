@@ -11,6 +11,7 @@ import pickle
 import argparse
 
 import attr
+import click
 import numpy as np
 import pandas as pd
 
@@ -20,6 +21,7 @@ from trickster.adversarial_helper import SearchParams, SearchFuncs
 from trickster.adversarial_helper import find_adversarial_example
 from trickster.wfp_helper import extract, pad_and_onehot, load_data
 from trickster.wfp_helper import insert_dummy_packets
+from trickster.utils.cli import add_options
 
 from tqdm import tqdm
 from sklearn.utils import shuffle
@@ -34,7 +36,7 @@ from profiled import Profiler, profiled
 SEED = 1
 np.random.seed(seed=SEED)
 
-DEBUG_PLOT_FREQ = 10
+DEBUG_PLOT_FREQ = 50
 
 
 @attr.s
@@ -49,6 +51,7 @@ class Datasets:
 
 
 def prepare_data(data_path, features="cumul", max_len=None):
+    """Load a dataset and extract features."""
     X, y = load_data(path=data_path, max_len=max_len)
 
     # Split into training and test sets
@@ -85,7 +88,6 @@ def prepare_data(data_path, features="cumul", max_len=None):
 
 def fit_logistic_regression_model(datasets):
     """Train the target model --- logistic regression."""
-    print("Fitting the model...")
     clf = LogisticRegressionCV(Cs=21, cv=5, n_jobs=-1, penalty="l2", random_state=SEED)
     clf.fit(datasets.X_train_features, datasets.y_train)
 
@@ -169,7 +171,7 @@ class TraceNode:
         for i in range(len(self.trace)):
             trace = insert_dummy_packets(self.trace, i, self.dummies_per_insertion)
             if self.max_len is not None and (len(trace) > self.max_len):
-                trace = trace[:self.max_len]
+                trace = trace[: self.max_len]
             node = self.clone(new_trace=trace, new_depth=self.depth + 1)
             children.append(node)
         return children
@@ -241,10 +243,10 @@ def hash_fn(x):
 
 
 def run_wfp_experiment(
+    model_pickle,
     data_path="data/knndata",
     features="cumul",
     target_confidence=0.5,
-    output_path=None,
     p_norm=1,
     q_norm=np.inf,
     epsilon=1.,
@@ -252,11 +254,11 @@ def run_wfp_experiment(
     iter_lim=None,
     max_num_examples=None,
     dummies_per_insertion=1,
+    output_pickle=None,
 ):
-    """Find adversarial examples for a whole dataset"""
-
+    """Find adversarial examples for a dataset"""
+    clf = pickle.load(model_pickle)
     datasets = prepare_data(data_path, features=features, max_len=max_trace_len)
-    clf = fit_logistic_regression_model(datasets)
 
     # Dataframe for storing the results.
     results = pd.DataFrame(
@@ -324,6 +326,7 @@ def run_wfp_experiment(
         nodes_expanded = expanded_counter.count
         profiler_stats = per_example_profiler.compute_stats()
         runtime = profiler_stats["find_adversarial_example"]["tot"]
+
         features = datasets.X_test_features[original_index]
         original_confidence = clf.predict_proba([features])[0, 1]
 
@@ -362,73 +365,116 @@ def run_wfp_experiment(
                 runtime,
                 target_confidence,
             ]
-            if output_path is not None:
-                with open(output_path, "wb") as f:
-                    pickle.dump(results, f)
+
+        import ipdb
+
+        ipdb.set_trace()
+        if output_pickle is not None:
+            pickle.dump(results, output_pickle)
 
         print(results.loc[i])
 
     return results
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Generate adversarial examples for WFP"
-    )
-    parser.add_argument(
+common_options = [
+    click.option(
+        "--data_path",
+        default="data/knndata",
+        type=click.Path(exists=True),
+        help="Path to knndata traces.",
+    ),
+    click.option(
         "--features",
-        choices=["cumul", "raw"],
-        default="cumul",
-        help="feature extraction",
-    )
-    parser.add_argument(
-        "--confidence-level",
-        type=float,
-        default=0.5,
-        help="target confidence level for adversarial example",
-    )
-    parser.add_argument(
-        "--num_examples", type=int, default=None, help="number of examples"
-    )
-    parser.add_argument(
-        "--iter_lim", type=int, default=1000, help="max number of search iterations"
-    )
-    parser.add_argument("--epsilon", type=int, default=1., help="greediness parameter")
-    parser.add_argument(
-        "--output", default=None, help="path to output pickled dataframe"
-    )
-    parser.add_argument(
-        "--data_path", default="data/knndata/", help="path to input traces"
-    )
-    parser.add_argument(
-        # 6746 is 95-th percentile on the knndata.
+        default="raw",
+        type=click.Choice(["raw", "cumul"]),
+        help="Feature extraction.",
+    ),
+    click.option(
         "--max_trace_len",
+        default=6746,
         type=int,
-        default=6745,
-        help="max trace length",
-    )
-    parser.add_argument(
-        "--dummies_per_insertion",
-        type=int,
-        default=3,
-        help="number of dummy packets per insersion",
-    )
-    args = parser.parse_args()
+        help="Number of packets to cut traces to.",
+    ),
+]
 
-    results = run_wfp_experiment(
-        data_path=args.data_path,
-        target_confidence=args.confidence_level,
-        features=args.features,
+
+@click.group()
+def cli():
+    """Generate adversarial examples for website fingerprinting models."""
+    pass
+
+
+@cli.command()
+@add_options(common_options)
+@click.option(
+    "--model_pickle",
+    default="model.pkl",
+    type=click.File("wb"),
+    help="Model pickle path.",
+)
+def train(data_path, features, max_trace_len, model_pickle):
+    """Train a target logistic regression model."""
+    datasets = prepare_data(data_path, features=features, max_len=max_trace_len)
+
+    click.echo("Fitting the model...")
+    clf = fit_logistic_regression_model(datasets)
+
+    click.echo("Saving the model...")
+    pickle.dump(clf, model_pickle)
+    click.echo("Done.")
+
+
+@cli.command()
+@add_options(common_options)
+@click.option(
+    "--model_pickle", type=click.File("rb"), help="Pickled model path.", required=True
+)
+@click.option("--confidence_level", default=0.5, help="Target confidence level.")
+@click.option("--num_examples", help="Number of adversarial examples to generate.")
+@click.option(
+    "--iter_lim",
+    default=10000,
+    help="Max number of search iterations until before giving up.",
+)
+@click.option(
+    "--dummies_per_insertion",
+    default=1,
+    help="Number of dummy packets to insert for each transformation.",
+)
+@click.option("--epsilon", default=1, help="The more the greedier.")
+@click.option(
+    "--output_pickle", type=click.File("wb"), help="The more the greedier."
+)
+def generate(
+    data_path,
+    features,
+    max_trace_len,
+    model_pickle,
+    confidence_level,
+    num_examples,
+    iter_lim,
+    dummies_per_insertion,
+    epsilon,
+    output_pickle,
+):
+    """Generate adversarial examples."""
+    run_wfp_experiment(
+        model_pickle=model_pickle,
+        data_path=data_path,
+        target_confidence=confidence_level,
+        features=features,
         p_norm=np.inf,
         q_norm=1,
-        epsilon=args.epsilon,
-        iter_lim=args.iter_lim,
-        max_trace_len=args.max_trace_len,
-        max_num_examples=args.num_examples,
-        dummies_per_insertion=args.dummies_per_insertion,
-        output_path=args.output,
+        epsilon=epsilon,
+        iter_lim=iter_lim,
+        max_trace_len=max_trace_len,
+        max_num_examples=num_examples,
+        dummies_per_insertion=dummies_per_insertion,
+        output_pickle=output_pickle,
     )
 
 
 if __name__ == "__main__":
-    main()
+    cli()
+
