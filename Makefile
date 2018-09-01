@@ -8,3 +8,10 @@ data: ${TEMP_DIR}/knndata.zip
 .tmp/knndata.zip:
 	mkdir -p ${TEMP_DIR}
 	curl https://www.cse.ust.hk/~taow/wf/data/knndata.zip > ${TEMP_DIR}/knndata.zip
+
+.PHONY: format
+format:
+	black scripts
+	black trickster
+	black tests
+
