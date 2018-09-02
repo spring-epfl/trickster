@@ -141,7 +141,7 @@ def load_data(path, *args, **kwargs):
     """Load traces from a folder."""
     labels = []
     data = []
-    for filename in tqdm(os.listdir(path)):
+    for filename in tqdm(sorted(os.listdir(path))):
         file_path = os.path.join(path, filename)
         if os.path.isfile(file_path):
             cell_list = load_cell_data(file_path, *args, **kwargs)
