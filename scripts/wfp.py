@@ -162,11 +162,9 @@ class TraceNode:
 
         elif self._features_type == "raw":
             _, (encoded_trace,) = pad_and_onehot([self.trace], pad_len=self.max_len)
-            encoded_trace = encoded_trace
 
         elif self._features_type == "total":
-            _, (encoded_trace,) = extract(self.trace, interpolated_features=False)
-            encoded_trace = encoded_trace
+            encoded_trace = extract(self.trace, interpolated_features=False)
 
         self._features = encoded_trace
         return encoded_trace
@@ -482,7 +480,11 @@ def train(data_path, features, max_trace_len, log_file, model, model_pickle):
     show_default=True,
     help="Target confidence level.",
 )
-@click.option("--num_examples", help="Number of adversarial examples to generate.")
+@click.option(
+    "--num_examples",
+    type=int,
+    help="Number of adversarial examples to generate."
+)
 @click.option(
     "--iter_lim",
     default=10000,
