@@ -403,7 +403,7 @@ def run_wfp_experiment(
             ]
 
         if output_pickle is not None:
-            pickle.dump(results, output_pickle)
+           results.to_pickle(output_pickle)
 
         logger.debug(results.loc[i])
 
@@ -497,7 +497,7 @@ def train(data_path, features, max_trace_len, log_file, model, model_pickle):
 )
 @click.option("--epsilon", default=1, show_default=True, help="The more the greedier.")
 @click.option(
-    "--output_pickle", type=click.File("wb"), help="Output results dataframe pickle."
+    "--output_pickle", type=click.Path(exists=False, dir_okay=False), help="Output results dataframe pickle."
 )
 def generate(
     data_path,
