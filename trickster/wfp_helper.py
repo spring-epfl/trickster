@@ -5,16 +5,21 @@ import numpy as np
 from tqdm import tqdm
 
 
-def extract(trace):
+def extract(trace, interpolated_features=True):
     """Extract CUMUL features from a single trace.
 
-    :param trace: (Signed) list of packet sizes
+    :param trace: (Signed) list of packet sizes.
+    :param interpolated_features: Whether to include interpolated features.
 
-    >>> cumul_vector = extract([1, 1, -1, -1, -1])
+    >>> trace = [1, 1, -1, -1, -1]
+    >>> cumul_vector = extract(trace)
     >>> len(cumul_vector)
     104
     >>> cumul_vector[:4]
     array([3., 2., 3., 2.])
+
+    >>> extract(trace, interpolated_features=False)
+    array([3, 2, 3, 2])
     """
 
     # First 4 features.
@@ -43,29 +48,30 @@ def extract(trace):
         graph.append([x, y])
 
     # Derive interpolants.
-    max_x = graph[-1][0]
-    gap = float(max_x) / (n + 1)
-    graph_ptr = 0
-    for i in range(0, n):
-        sample_x = gap * (i + 1)
-        while graph[graph_ptr][0] < sample_x:
-            graph_ptr += 1
-            if graph_ptr >= len(graph) - 1:
-                graph_ptr = len(graph) - 1
-                # Wouldn't be necessary if floats were floats.
-                break
-        next_y = graph[graph_ptr][1]
-        next_x = graph[graph_ptr][0]
-        last_y = graph[graph_ptr - 1][1]
-        last_x = graph[graph_ptr - 1][0]
+    if interpolated_features:
+        max_x = graph[-1][0]
+        gap = float(max_x) / (n + 1)
+        graph_ptr = 0
+        for i in range(0, n):
+            sample_x = gap * (i + 1)
+            while graph[graph_ptr][0] < sample_x:
+                graph_ptr += 1
+                if graph_ptr >= len(graph) - 1:
+                    graph_ptr = len(graph) - 1
+                    # Wouldn't be necessary if floats were floats.
+                    break
+            next_y = graph[graph_ptr][1]
+            next_x = graph[graph_ptr][0]
+            last_y = graph[graph_ptr - 1][1]
+            last_x = graph[graph_ptr - 1][0]
 
-        if next_x - last_x != 0:
-            slope = (next_y - last_y) / float(next_x - last_x)
-        else:
-            slope = 1000
-        sample_y = slope * (sample_x - last_x) + last_y
+            if next_x - last_x != 0:
+                slope = (next_y - last_y) / float(next_x - last_x)
+            else:
+                slope = 1000
+            sample_y = slope * (sample_x - last_x) + last_y
 
-        features.append(sample_y)
+            features.append(sample_y)
 
     return np.array(features)
 

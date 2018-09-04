@@ -78,6 +78,14 @@ def prepare_data(data_path, features="cumul", max_len=None):
         pad_len, X_train_features = pad_and_onehot(X_train, pad_len=max_len)
         _, X_test_features = pad_and_onehot(X_test, pad_len=pad_len)
 
+    elif features == "total":
+        X_train_features = np.array(
+            [extract(trace, interpolated_features=False) for trace in X_train]
+        )
+        X_test_features = np.array(
+            [extract(trace, interpolated_features=False) for trace in X_test]
+        )
+
     logger.info("Train features shape: {}".format(X_train_features.shape))
     logger.info("Test features shape: {}".format(X_test_features.shape))
 
@@ -106,12 +114,28 @@ def fit_logistic_regression_model(datasets):
     return clf
 
 
+def fit_svm(datasets):
+    params = {"kernel": ["rbf"], "gamma": [1e-5], "C": [100]}
+
+    clf = GridSearchCV(SVC(probability=True), params, cv=5, scoring="accuracy")
+    clf.fit(datasets.X_train_features, datasets.y_train)
+
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.info(
+        "Test score is: {:.3f}%.".format(
+            clf.score(datasets.X_test_features, datasets.y_test) * 100
+        )
+    )
+
+    return clf
+
+
 class TraceNode:
     """A node in the tranformation graph of traces.
 
     :param trace: A trace
     :param depth: Depth in the graph
-    :param features: One of ["cumul", "raw"]
+    :param features: One of ["cumul", "raw", "total"]
     :param max_len: Max trace length (to pad to)
     :param dummies_per_insertion: Number of dummies to insert for each neighbouring node.
     """
@@ -119,8 +143,6 @@ class TraceNode:
     def __init__(
         self, trace, depth=0, features="cumul", max_len=None, dummies_per_insertion=1
     ):
-        if features not in ["cumul", "raw"]:
-            raise ValueError("Unknown features type: %s" % features)
         self._features_type = features
 
         self.trace = list(trace)
@@ -140,6 +162,10 @@ class TraceNode:
 
         elif self._features_type == "raw":
             _, (encoded_trace,) = pad_and_onehot([self.trace], pad_len=self.max_len)
+            encoded_trace = encoded_trace
+
+        elif self._features_type == "total":
+            _, (encoded_trace,) = extract(self.trace, interpolated_features=False)
             encoded_trace = encoded_trace
 
         self._features = encoded_trace
@@ -394,9 +420,9 @@ common_options = [
     ),
     click.option(
         "--features",
-        default="raw",
+        default="total",
         show_default=True,
-        type=click.Choice(["raw", "cumul"]),
+        type=click.Choice(["raw", "cumul", "total"]),
         help="Feature extraction.",
     ),
     click.option(
@@ -405,6 +431,9 @@ common_options = [
         show_default=True,
         type=int,
         help="Number of packets to cut traces to.",
+    ),
+    click.option(
+        "--log_file", default="log/wfp.log", type=click.Path(), help="Log file path."
     ),
 ]
 
@@ -418,17 +447,24 @@ def cli():
 @cli.command()
 @add_options(common_options)
 @click.option(
+    "--model", default="lr", type=click.Choice(["lr", "svmrbf"]), help="Model type."
+)
+@click.option(
     "--model_pickle",
     default="model.pkl",
     type=click.File("wb"),
     help="Model pickle path.",
 )
-def train(data_path, features, max_trace_len, model_pickle):
+def train(data_path, features, max_trace_len, log_file, model, model_pickle):
     """Train a target logistic regression model."""
+    logger = setup_custom_logger(log_file)
     datasets = prepare_data(data_path, features=features, max_len=max_trace_len)
 
     click.echo("Fitting the model...")
-    clf = fit_logistic_regression_model(datasets)
+    if model == "lr":
+        clf = fit_logistic_regression_model(datasets)
+    elif model == "svmrbf":
+        clf = fit_svm(datasets)
 
     click.echo("Saving the model...")
     pickle.dump(clf, model_pickle)
@@ -463,13 +499,11 @@ def train(data_path, features, max_trace_len, model_pickle):
 @click.option(
     "--output_pickle", type=click.File("wb"), help="Output results dataframe pickle."
 )
-@click.option(
-    "--log_file", default="log/wfp.log", type=click.Path(), help="Log file path."
-)
 def generate(
     data_path,
     features,
     max_trace_len,
+    log_file,
     model_pickle,
     confidence_level,
     num_examples,
@@ -477,7 +511,6 @@ def generate(
     dummies_per_insertion,
     epsilon,
     output_pickle,
-    log_file,
 ):
     """Generate adversarial examples."""
     run_wfp_experiment(
