@@ -418,7 +418,7 @@ common_options = [
     ),
     click.option(
         "--features",
-        default="total",
+        default="cumul",
         show_default=True,
         type=click.Choice(["raw", "cumul", "total"]),
         help="Feature extraction.",
