@@ -11,8 +11,6 @@ venv
 *.egg-info
 .eggs
 
-data/knndata
 .tmp
 
-log/*
-!log/.gitkeep
+*.pkl
