@@ -53,9 +53,9 @@ class Datasets:
     y_test = attr.ib()
 
 
-def prepare_data(data_path, features="cumul", max_len=None):
+def prepare_data(data_path, features="cumul", max_len=None, filter_by_size=True):
     """Load a dataset and extract features."""
-    X, y = load_data(path=data_path, max_len=max_len)
+    X, y = load_data(path=data_path, max_len=max_len, filter_by_size=filter_by_size)
 
     # Split into training and test sets
     X_train, X_test, y_train, y_test = train_test_split(
@@ -287,12 +287,18 @@ def run_wfp_experiment(
     dummies_per_insertion=1,
     output_pickle=None,
     log_file=None,
+    filter_by_size=True,
 ):
     """Find adversarial examples for a dataset"""
     logger = setup_custom_logger(log_file)
 
     clf = pickle.load(model_pickle)
-    datasets = prepare_data(data_path, features=features, max_len=max_trace_len)
+    datasets = prepare_data(
+        data_path,
+        features=features,
+        max_len=max_trace_len,
+        filter_by_size=filter_by_size,
+    )
 
     # Dataframe for storing the results.
     results = pd.DataFrame(
@@ -401,7 +407,7 @@ def run_wfp_experiment(
             ]
 
         if output_pickle is not None:
-           results.to_pickle(output_pickle)
+            results.to_pickle(output_pickle)
 
         logger.debug(results.loc[i])
 
@@ -415,6 +421,9 @@ common_options = [
         show_default=True,
         type=click.Path(exists=True, file_okay=False),
         help="Path to knndata traces.",
+    ),
+    click.option(
+        "--log_file", default="log/wfp.log", type=click.Path(), help="Log file path."
     ),
     click.option(
         "--features",
@@ -431,7 +440,10 @@ common_options = [
         help="Number of packets to cut traces to.",
     ),
     click.option(
-        "--log_file", default="log/wfp.log", type=click.Path(), help="Log file path."
+        "--filter_by_size/--no_filter_by_size",
+        default=True,
+        show_default=True,
+        help="Whether to filter out traces over max_trace_len.",
     ),
 ]
 
@@ -481,9 +493,7 @@ def train(data_path, features, max_trace_len, log_file, model, model_pickle):
     help="Target confidence level.",
 )
 @click.option(
-    "--num_examples",
-    type=int,
-    help="Number of adversarial examples to generate."
+    "--num_examples", type=int, help="Number of adversarial examples to generate."
 )
 @click.option(
     "--iter_lim",
@@ -499,13 +509,16 @@ def train(data_path, features, max_trace_len, log_file, model, model_pickle):
 )
 @click.option("--epsilon", default=1, show_default=True, help="The more the greedier.")
 @click.option(
-    "--output_pickle", type=click.Path(exists=False, dir_okay=False), help="Output results dataframe pickle."
+    "--output_pickle",
+    type=click.Path(exists=False, dir_okay=False),
+    help="Output results dataframe pickle.",
 )
 def generate(
     data_path,
+    log_file,
     features,
     max_trace_len,
-    log_file,
+    filter_by_size,
     model_pickle,
     confidence_level,
     num_examples,
@@ -529,6 +542,7 @@ def generate(
         dummies_per_insertion=dummies_per_insertion,
         output_pickle=output_pickle,
         log_file=log_file,
+        filter_by_size=filter_by_size,
     )
 
 

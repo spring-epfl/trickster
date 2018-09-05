@@ -76,7 +76,7 @@ def extract(trace, interpolated_features=True):
     return np.array(features)
 
 
-def load_cell_data(filename, time=0, ext=".cell", max_len=None):
+def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_size=True):
     """Load cell data from file.
 
     :param time: If zero, don't load packet times (saves time and memoty).
@@ -139,21 +139,33 @@ def load_cell_data(filename, time=0, ext=".cell", max_len=None):
 
     if max_len is None:
         return data
-    else:
+
+    # No filtering.
+    elif not filter_by_size:
         return data[:max_len]
 
+    # Filtering is on: if the trace is longer than max_len, return None.
+    else:
+        if len(data) <= max_len:
+            return data
+        else:
+            return None
 
-def load_data(path, *args, **kwargs):
+
+def load_data(path, max_len=None, filter_by_size=True):
     """Load traces from a folder."""
     labels = []
     data = []
     for filename in tqdm(sorted(os.listdir(path))):
         file_path = os.path.join(path, filename)
         if os.path.isfile(file_path):
-            cell_list = load_cell_data(file_path, *args, **kwargs)
-            label = 1 if "-" in str(filename) else 0
-            data.append(cell_list)
-            labels.append(label)
+            cell_list = load_cell_data(
+                file_path, max_len=max_len, filter_by_size=filter_by_size
+            )
+            if cell_list is not None:
+                label = 1 if "-" in str(filename) else 0
+                data.append(cell_list)
+                labels.append(label)
     labels = np.array(labels)
     data = np.array(data)
     return data, labels
