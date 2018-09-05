@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+"""
+Experiment with generating adversarial examples for a fingerprinting classifier
+implemented as a logistic regression on top of CUMUL features.
+"""
 
 import sys
-import copy
 
 sys.path.append("..")
 
@@ -10,6 +13,8 @@ import math
 import pickle
 import argparse
 import logging
+import pprint
+import random
 
 import attr
 import click
@@ -36,10 +41,12 @@ from defaultcontext import with_default_context
 from profiled import Profiler, profiled
 
 
-SEED = 1
-np.random.seed(seed=SEED)
-
 DEBUG_PLOT_FREQ = 50
+
+
+def set_seed(seed=1):
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 @attr.s
@@ -53,16 +60,31 @@ class Datasets:
     y_test = attr.ib()
 
 
-def prepare_data(data_path, features="cumul", max_len=None, filter_by_size=True):
+def prepare_data(
+    data_path,
+    features="cumul",
+    shuffle=False,
+    max_traces=None,
+    max_trace_len=None,
+    filter_by_len=True,
+):
     """Load a dataset and extract features."""
-    X, y = load_data(path=data_path, max_len=max_len, filter_by_size=filter_by_size)
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.info("Loading the data...")
 
-    # Split into training and test sets
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.1, random_state=SEED
+    X, y = load_data(
+        path=data_path,
+        shuffle=shuffle,
+        max_traces=max_traces,
+        max_trace_len=max_trace_len,
+        filter_by_len=filter_by_len,
     )
 
-    logger = logging.getLogger(LOGGER_NAME)
+    logger.info("Loaded.")
+
+    # Split into training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1)
+
     logger.info(
         "Number of train samples: {}, Number test samples: {}".format(
             X_train.shape[0], X_test.shape[0]
@@ -75,7 +97,7 @@ def prepare_data(data_path, features="cumul", max_len=None, filter_by_size=True)
         X_test_features = np.array([extract(trace) for trace in X_test])
 
     elif features == "raw":
-        pad_len, X_train_features = pad_and_onehot(X_train, pad_len=max_len)
+        pad_len, X_train_features = pad_and_onehot(X_train, pad_len=max_trace_len)
         _, X_test_features = pad_and_onehot(X_test, pad_len=pad_len)
 
     elif features == "total":
@@ -101,7 +123,7 @@ def prepare_data(data_path, features="cumul", max_len=None, filter_by_size=True)
 
 def fit_logistic_regression_model(datasets):
     """Train the target model --- logistic regression."""
-    clf = LogisticRegressionCV(Cs=21, cv=5, n_jobs=-1, penalty="l2", random_state=SEED)
+    clf = LogisticRegressionCV(Cs=21, cv=5, n_jobs=-1, penalty="l2")
     clf.fit(datasets.X_train_features, datasets.y_train)
 
     logger = logging.getLogger(LOGGER_NAME)
@@ -278,26 +300,28 @@ def run_wfp_experiment(
     data_path="data/knndata",
     features="cumul",
     target_confidence=0.5,
-    p_norm=1,
-    q_norm=np.inf,
+    p_norm="1",
     epsilon=1.,
+    shuffle=False,
+    max_traces=None,
     max_trace_len=None,
     iter_lim=None,
-    max_num_examples=None,
+    max_num_adv_examples=None,
     dummies_per_insertion=1,
     output_pickle=None,
     log_file=None,
-    filter_by_size=True,
+    filter_by_len=True,
 ):
     """Find adversarial examples for a dataset"""
-    logger = setup_custom_logger(log_file)
+    logger = logging.getLogger(LOGGER_NAME)
 
     clf = pickle.load(model_pickle)
     datasets = prepare_data(
         data_path,
         features=features,
-        max_len=max_trace_len,
-        filter_by_size=filter_by_size,
+        shuffle=shuffle,
+        max_trace_len=max_trace_len,
+        filter_by_len=filter_by_len,
     )
 
     # Dataframe for storing the results.
@@ -317,6 +341,18 @@ def run_wfp_experiment(
         ]
     )
 
+    # Pick appropriate values of p and q norms.
+    if p_norm == "1":
+        p_norm = 1
+        q_norm = np.inf
+    elif p_norm == "2":
+        p_norm = 2
+        q_norm = 2
+    elif p_norm == "inf":
+        p_norm = np.inf
+        q_norm = 1
+
+    # Set the global search parameters.
     search_params = SearchParams(
         clf=clf,
         target_class=1,
@@ -327,12 +363,12 @@ def run_wfp_experiment(
     )
     SearchParams.set_global_default(search_params)
 
+    # Set the A* search functions.
     node_params = dict(
         features=features,
         max_len=max_trace_len,
         dummies_per_insertion=dummies_per_insertion,
     )
-
     search_funcs = SearchFuncs(
         example_wrapper_fn=lambda example: TraceNode(example, **node_params),
         expand_fn=expand_fn,
@@ -341,21 +377,25 @@ def run_wfp_experiment(
         hash_fn=hash_fn,
     )
 
-    # Indices of examples classified as negative.
+    # Find indices of examples classified as negative.
     neg_indices, = np.where(
         clf.predict_proba(datasets.X_test_features)[:, 1] < target_confidence
     )
     num_adv_examples_found = 0
+
+    logger.info("Searching for adversarial examples...")
     for i, original_index in enumerate(tqdm(neg_indices)):
-        if max_num_examples is not None and num_adv_examples_found > max_num_examples:
+        if (
+            max_num_adv_examples is not None
+            and num_adv_examples_found > max_num_adv_examples
+        ):
             break
 
         x = datasets.X_test_cell[original_index]
 
-        # Instantiate a counter for expanded nodes, and a profiler.
+        # Instantiate counters for expanded nodes, and a profiler.
         expanded_counter = ExpansionCounter()
         ExpansionCounter.set_global_default(expanded_counter)
-
         per_example_profiler = Profiler()
         Profiler.set_global_default(per_example_profiler)
 
@@ -425,12 +465,25 @@ common_options = [
     click.option(
         "--log_file", default="log/wfp.log", type=click.Path(), help="Log file path."
     ),
+    click.option("--seed", default=1, type=int, help="Random seed."),
     click.option(
         "--features",
         default="cumul",
         show_default=True,
         type=click.Choice(["raw", "cumul", "total"]),
         help="Feature extraction.",
+    ),
+    click.option(
+        "--shuffle/--no_shuffle",
+        default=False,
+        show_default=True,
+        help="Whether to shuffle the traces in the dataset.",
+    ),
+    click.option(
+        "--num_traces",
+        default=None,
+        type=int,
+        help="Number of traces from the dataset to consider.",
     ),
     click.option(
         "--max_trace_len",
@@ -440,7 +493,7 @@ common_options = [
         help="Number of packets to cut traces to.",
     ),
     click.option(
-        "--filter_by_size/--no_filter_by_size",
+        "--filter_by_len/--no_filter_by_len",
         default=True,
         show_default=True,
         help="Whether to filter out traces over max_trace_len.",
@@ -465,10 +518,29 @@ def cli():
     type=click.File("wb"),
     help="Model pickle path.",
 )
-def train(data_path, features, max_trace_len, log_file, model, model_pickle):
+def train(
+    data_path,
+    log_file,
+    seed,
+    features,
+    shuffle,
+    num_traces,
+    max_trace_len,
+    filter_by_len,
+    model,
+    model_pickle,
+):
     """Train a target logistic regression model."""
+    set_seed(seed)
     logger = setup_custom_logger(log_file)
-    datasets = prepare_data(data_path, features=features, max_len=max_trace_len)
+    datasets = prepare_data(
+        data_path,
+        features=features,
+        shuffle=shuffle,
+        max_traces=num_traces,
+        max_trace_len=max_trace_len,
+        filter_by_len=filter_by_len,
+    )
 
     click.echo("Fitting the model...")
     if model == "lr":
@@ -493,7 +565,7 @@ def train(data_path, features, max_trace_len, log_file, model, model_pickle):
     help="Target confidence level.",
 )
 @click.option(
-    "--num_examples", type=int, help="Number of adversarial examples to generate."
+    "--num_adv_examples", type=int, help="Number of adversarial examples to generate."
 )
 @click.option(
     "--iter_lim",
@@ -509,40 +581,58 @@ def train(data_path, features, max_trace_len, log_file, model, model_pickle):
 )
 @click.option("--epsilon", default=1, show_default=True, help="The more the greedier.")
 @click.option(
+    "--p_norm",
+    default="inf",
+    type=click.Choice(["1", "2", "inf"]),
+    help="The p parameter of the Lp norm for computing the cost.",
+)
+@click.option(
     "--output_pickle",
     type=click.Path(exists=False, dir_okay=False),
     help="Output results dataframe pickle.",
 )
+@click.pass_context
 def generate(
+    ctx,
     data_path,
     log_file,
+    seed,
     features,
+    shuffle,
+    num_traces,
     max_trace_len,
-    filter_by_size,
+    filter_by_len,
     model_pickle,
     confidence_level,
-    num_examples,
+    num_adv_examples,
     iter_lim,
     dummies_per_insertion,
     epsilon,
+    p_norm,
     output_pickle,
 ):
     """Generate adversarial examples."""
+    set_seed(seed)
+
+    logger = setup_custom_logger(log_file)
+    logger.info("Generating adversarial examples.")
+    logger.info("Params: %s" % pprint.pformat(ctx.params))
+
     run_wfp_experiment(
         model_pickle=model_pickle,
         data_path=data_path,
         target_confidence=confidence_level,
         features=features,
-        p_norm=np.inf,
-        q_norm=1,
+        p_norm=p_norm,
         epsilon=epsilon,
         iter_lim=iter_lim,
         max_trace_len=max_trace_len,
-        max_num_examples=num_examples,
+        max_num_adv_examples=num_adv_examples,
         dummies_per_insertion=dummies_per_insertion,
         output_pickle=output_pickle,
-        log_file=log_file,
-        filter_by_size=filter_by_size,
+        filter_by_len=filter_by_len,
+        shuffle=shuffle,
+        max_traces=num_traces,
     )
 
 

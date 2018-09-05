@@ -1,5 +1,10 @@
+"""
+Generic website fingerprinting utilities: feature extraction, and dataset loading.
+"""
+
 import os
 import sys
+import random
 
 import numpy as np
 from tqdm import tqdm
@@ -76,10 +81,13 @@ def extract(trace, interpolated_features=True):
     return np.array(features)
 
 
-def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_size=True):
+def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_len=True):
     """Load cell data from file.
 
     :param time: If zero, don't load packet times (saves time and memoty).
+    :param ext: Data format/extension. One of ``[".htor", ".cell", ".burst"]``
+    :param max_len: Max trace length.
+    :param filter_by_len: If True, traces over the max_len will be dropped.
     """
     data = []
     starttime = -1
@@ -141,7 +149,7 @@ def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_size=T
         return data
 
     # No filtering.
-    elif not filter_by_size:
+    elif not filter_by_len:
         return data[:max_len]
 
     # Filtering is on: if the trace is longer than max_len, return None.
@@ -152,20 +160,45 @@ def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_size=T
             return None
 
 
-def load_data(path, max_len=None, filter_by_size=True):
-    """Load traces from a folder."""
+def load_data(
+    path, shuffle=False, max_traces=None, max_trace_len=None, filter_by_len=True
+):
+    """Load traces from a folder.
+
+    :param shuffle: Whether to shuffle the traces.
+    :param max_traces: Max number of traces to load.
+
+    See :py:func:`load_cell_data` for information about the other arguments.
+    """
     labels = []
     data = []
-    for filename in tqdm(sorted(os.listdir(path))):
+
+    filenames = os.listdir(path)
+    if shuffle:
+        random.shuffle(filenames)
+    else:
+        filenames = sorted(filenames)
+
+    num_traces = 0
+    prog_bar = tqdm(total=len(filenames) if max_traces is None else max_traces)
+    for filename in tqdm(filenames):
         file_path = os.path.join(path, filename)
         if os.path.isfile(file_path):
-            cell_list = load_cell_data(
-                file_path, max_len=max_len, filter_by_size=filter_by_size
+            trace = load_cell_data(
+                file_path, max_len=max_trace_len, filter_by_len=filter_by_len
             )
-            if cell_list is not None:
+
+            # Trace might be None if it was longer than allowed.
+            if trace is not None:
                 label = 1 if "-" in str(filename) else 0
-                data.append(cell_list)
+                data.append(trace)
                 labels.append(label)
+
+                num_traces += 1
+                prog_bar.update(1)
+                if max_traces is not None and num_traces >= max_traces:
+                    break
+
     labels = np.array(labels)
     data = np.array(data)
     return data, labels
