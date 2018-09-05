@@ -514,7 +514,7 @@ def cli():
 )
 @click.option(
     "--model_pickle",
-    default="model.pkl",
+    required=True,
     type=click.File("wb"),
     help="Model pickle path.",
 )
