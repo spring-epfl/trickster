@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NPROC=${NPROC:=4}
-NUM_MODELS=5
+NUM_MODELS=20
 TRAIN_DATASET_SIZE=112
 GENERATION_DATASET_SIZE=100
 GENERATION_MAX_TRACE_LEN=500
@@ -12,6 +12,7 @@ seq $NUM_MODELS | \
     parallel -j $NPROC \
     scripts/wfp.py train \
         --seed {} \
+        --log_file "log/wfo_small_models_{}.log" \
         --shuffle \
         --num_traces $TRAIN_DATASET_SIZE \
         --model lr \
