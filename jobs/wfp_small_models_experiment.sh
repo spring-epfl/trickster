@@ -12,7 +12,7 @@ seq $NUM_MODELS | \
     parallel -j $NPROC \
     scripts/wfp.py train \
         --seed {} \
-        --log_file "log/wfo_small_models_{}.log" \
+        --log_file "log/wfp_small_models_{}.log" \
         --shuffle \
         --num_traces $TRAIN_DATASET_SIZE \
         --model lr \
@@ -23,7 +23,7 @@ echo "Generating adversarial examples..."
 seq $NUM_MODELS | \
     parallel -j $NPROC \
     scripts/wfp.py generate \
-        --log_file "log/wfo_small_models_{}.log" \
+        --log_file "log/wfp_small_models_{}.log" \
         --model_pickle "models/small_model_{}.pkl" \
         --iter_lim $ITER_LIM \
         --features cumul \
