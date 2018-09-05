@@ -26,19 +26,15 @@ The datasets include:
 
 ### Website fingerprinting
 
-Find provably epsilon-minimal adversarial examples:
+Train the target model:
 ```
-PYTHONPATH=. python scripts/wfp.py \
-    --iter_lim 100000
-    --num_examples 100
-    --max_trace_len 6000
-    --epsilon 1
-    --features cumul
-    --dummies_per_insertion 1
-    --output output_dataframe.pkl
+PYTHONPATH=. python scripts/wfp.py train --help
 ```
 
-Use the `--help` option for more details about the parameters.
+Generate provably epsilon-minimal adversarial examples:
+```
+PYTHONPATH=. python scripts/wfp.py generate --help
+```
 
 ## Development
 
