@@ -518,7 +518,9 @@ def cli():
     type=click.File("wb"),
     help="Model pickle path.",
 )
+@click.pass_context
 def train(
+    ctx,
     data_path,
     log_file,
     seed,
@@ -533,6 +535,8 @@ def train(
     """Train a target logistic regression model."""
     set_seed(seed)
     logger = setup_custom_logger(log_file)
+    logger.info("Params: %s" % pprint.pformat(ctx.params))
+
     datasets = prepare_data(
         data_path,
         features=features,
@@ -542,15 +546,15 @@ def train(
         filter_by_len=filter_by_len,
     )
 
-    click.echo("Fitting the model...")
+    logger.info("Fitting the model...")
     if model == "lr":
         clf = fit_logistic_regression_model(datasets)
     elif model == "svmrbf":
         clf = fit_svm(datasets)
 
-    click.echo("Saving the model...")
+    logger.info("Saving the model...")
     pickle.dump(clf, model_pickle)
-    click.echo("Done.")
+    logger.info("Done.")
 
 
 @cli.command()
