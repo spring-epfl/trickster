@@ -387,7 +387,7 @@ def run_wfp_experiment(
     for i, original_index in enumerate(tqdm(neg_indices)):
         if (
             max_num_adv_examples is not None
-            and num_adv_examples_found > max_num_adv_examples
+            and num_adv_examples_found >= max_num_adv_examples
         ):
             break
 
