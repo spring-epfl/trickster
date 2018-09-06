@@ -513,10 +513,7 @@ def cli():
     "--model", default="lr", type=click.Choice(["lr", "svmrbf"]), help="Model type."
 )
 @click.option(
-    "--model_pickle",
-    required=True,
-    type=click.File("wb"),
-    help="Model pickle path.",
+    "--model_pickle", required=True, type=click.File("wb"), help="Model pickle path."
 )
 @click.pass_context
 def train(
