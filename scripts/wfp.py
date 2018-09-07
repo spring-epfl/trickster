@@ -36,6 +36,7 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.svm import SVC
+from sklearn import preprocessing
 
 from defaultcontext import with_default_context
 from profiled import Profiler, profiled
@@ -67,6 +68,7 @@ def prepare_data(
     max_traces=None,
     max_trace_len=None,
     filter_by_len=True,
+    normalize=True,
 ):
     """Load a dataset and extract features."""
     logger = logging.getLogger(LOGGER_NAME)
@@ -96,6 +98,12 @@ def prepare_data(
         X_train_features = np.array([extract(trace) for trace in X_train])
         X_test_features = np.array([extract(trace) for trace in X_test])
 
+        if normalize:
+            X_train_features[:, :4] = preprocessing.scale(X_train_features[:, :4])
+            X_train_features[:, 4:] = preprocessing.scale(X_train_features[:, 4:])
+            X_test_features[:, :4] = preprocessing.scale(X_test_features[:, :4])
+            X_test_features[:, 4:] = preprocessing.scale(X_test_features[:, 4:])
+
     elif features == "raw":
         pad_len, X_train_features = pad_and_onehot(X_train, pad_len=max_trace_len)
         _, X_test_features = pad_and_onehot(X_test, pad_len=pad_len)
@@ -107,6 +115,10 @@ def prepare_data(
         X_test_features = np.array(
             [extract(trace, interpolated_features=False) for trace in X_test]
         )
+
+        if normalize:
+            X_train_features = preprocessing.scale(X_train_features)
+            X_test_features = preprocessing.scale(X_test_features)
 
     logger.info("Train features shape: {}".format(X_train_features.shape))
     logger.info("Test features shape: {}".format(X_test_features.shape))
@@ -312,6 +324,7 @@ def run_wfp_experiment(
     output_pickle=None,
     log_file=None,
     filter_by_len=True,
+    normalize=False,
 ):
     """Find adversarial examples for a dataset"""
     logger = logging.getLogger(LOGGER_NAME)
@@ -323,6 +336,7 @@ def run_wfp_experiment(
         shuffle=shuffle,
         max_trace_len=max_trace_len,
         filter_by_len=filter_by_len,
+        normalize=normalize
     )
 
     # Dataframe for storing the results.
@@ -485,6 +499,12 @@ common_options = [
         help="Whether to shuffle the traces in the dataset.",
     ),
     click.option(
+        "--normalize/--no_normalize",
+        default=False,
+        show_default=True,
+        help="Whether to normalize the dataset.",
+    ),
+    click.option(
         "--num_traces",
         default=None,
         type=int,
@@ -528,13 +548,14 @@ def train(
     seed,
     features,
     shuffle,
+    normalize,
     num_traces,
     max_trace_len,
     filter_by_len,
     model,
     model_pickle,
 ):
-    """Train a target logistic regression model."""
+    """Train a target model."""
     set_seed(seed)
     logger = setup_custom_logger(log_file)
     logger.info("Params: %s" % pprint.pformat(ctx.params))
@@ -546,6 +567,7 @@ def train(
         max_traces=num_traces,
         max_trace_len=max_trace_len,
         filter_by_len=filter_by_len,
+        normalize=normalize
     )
 
     logger.info("Fitting the model...")
@@ -611,6 +633,7 @@ def generate(
     seed,
     features,
     shuffle,
+    normalize,
     num_traces,
     max_trace_len,
     filter_by_len,
@@ -647,6 +670,7 @@ def generate(
         filter_by_len=filter_by_len,
         shuffle=shuffle,
         max_traces=num_traces,
+        normalize=normalize
     )
 
 
