@@ -107,3 +107,24 @@ def test_generation(file_factory, trained_model_pickle):
     # One example is expected to be found.
     assert len(results) == 1
     assert results.found.mean() == 1.0
+
+
+def test_generation_sort_by_len(file_factory, trained_model_pickle):
+    with file_factory() as results_file:
+        log = invoke_wfp_script(
+            "generate",
+            model_pickle=trained_model_pickle.name,
+            data_path=DATA_PATH,
+            output_pickle=results_file.name,
+            sort_by_len=True,
+            # Don't do any search.
+            iter_lim=0,
+        )
+
+        results = pd.read_pickle(results_file.name)
+
+    # One example is expected to be found.
+    prev_len = None
+    for _, row in results.iterrows():
+        assert prev_len is None or len(row.x) >= prev_len
+        prev_len = len(row.x)

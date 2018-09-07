@@ -307,6 +307,7 @@ def run_wfp_experiment(
     max_trace_len=None,
     iter_lim=None,
     max_num_adv_examples=None,
+    sort_by_len=False,
     dummies_per_insertion=1,
     output_pickle=None,
     log_file=None,
@@ -381,9 +382,13 @@ def run_wfp_experiment(
     neg_indices, = np.where(
         clf.predict_proba(datasets.X_test_features)[:, 1] < target_confidence
     )
-    num_adv_examples_found = 0
+    neg_indices = list(neg_indices)
+    if sort_by_len:
+        neg_indices = sorted(neg_indices, key=lambda i: len(datasets.X_test_cell[i]))
 
     logger.info("Searching for adversarial examples...")
+
+    num_adv_examples_found = 0
     for i, original_index in enumerate(tqdm(neg_indices)):
         if (
             max_num_adv_examples is not None
@@ -575,6 +580,12 @@ def train(
     help="Max number of search iterations until before giving up.",
 )
 @click.option(
+    "--sort_by_len/--no_sort_by_len",
+    default=False,
+    show_default=True,
+    help="If true, the search will start from smaller traces.",
+)
+@click.option(
     "--dummies_per_insertion",
     default=1,
     show_default=True,
@@ -607,6 +618,7 @@ def generate(
     confidence_level,
     num_adv_examples,
     iter_lim,
+    sort_by_len,
     dummies_per_insertion,
     epsilon,
     p_norm,
@@ -629,6 +641,7 @@ def generate(
         iter_lim=iter_lim,
         max_trace_len=max_trace_len,
         max_num_adv_examples=num_adv_examples,
+        sort_by_len=sort_by_len,
         dummies_per_insertion=dummies_per_insertion,
         output_pickle=output_pickle,
         filter_by_len=filter_by_len,
