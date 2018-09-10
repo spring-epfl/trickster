@@ -336,7 +336,7 @@ def run_wfp_experiment(
         shuffle=shuffle,
         max_trace_len=max_trace_len,
         filter_by_len=filter_by_len,
-        normalize=normalize
+        normalize=normalize,
     )
 
     # Dataframe for storing the results.
@@ -567,7 +567,7 @@ def train(
         max_traces=num_traces,
         max_trace_len=max_trace_len,
         filter_by_len=filter_by_len,
-        normalize=normalize
+        normalize=normalize,
     )
 
     logger.info("Fitting the model...")
@@ -648,6 +648,11 @@ def generate(
     output_pickle,
 ):
     """Generate adversarial examples."""
+    if normalize:
+        raise NotImplementedError(
+            "Generation of normalize feature vectors not supported"
+        )
+
     set_seed(seed)
 
     logger = setup_custom_logger(log_file)
@@ -670,7 +675,7 @@ def generate(
         filter_by_len=filter_by_len,
         shuffle=shuffle,
         max_traces=num_traces,
-        normalize=normalize
+        normalize=normalize,
     )
 
 
