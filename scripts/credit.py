@@ -11,6 +11,7 @@ warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
+import pickle
 
 from trickster.search import a_star_search, ida_star_search
 from trickster.adversarial_helper import *
@@ -126,28 +127,42 @@ if __name__ == "__main__":
     # Define the meta-experiment parameters.
     bin_counts = np.arange(5, 101, 5)
     p_norm, q_norm = 1, np.inf
+    epsilons = [1, 2, 3, 5, 10]
 
     results = []
 
     # Perform the experiments.
     logger.info("Starting experiments for the credit fraud dataset.")
 
-    for bins in bin_counts:
-        logger.info("Loading and preprocessing input data for {} bins...".format(bins))
-        result = experiment_wrapper(
-            load_transform_data_fn=load_transform_data_fn,
-            load_kwargs=dict(data_file=data_file, bins=bins),
-            clf_fit_fn=clf_fit_fn,
-            target_class=1,
-            get_expansions_fn=get_expansions_fn,
-            get_expansions_kwargs=dict(expand_quantized_fn=expand_quantized),
-            baseline_dataset_find_examples_fn=baseline_detaset_find_examples_fn,
-            logger=logger,
-            random_state=SEED,
-        )
+    for epsilon in epsilons:
 
-        result["bins"] = bins
+        logger.info("Loading and preprocessing input data for epsilon: {}...".format(epsilon))
 
-    import ipdb
+        for bins in bin_counts:
 
-    ipdb.set_trace()
+            logger.info("Loading and preprocessing input data for {} bins...".format(bins))
+            result = experiment_wrapper(
+                load_transform_data_fn=load_transform_data_fn,
+                load_kwargs=dict(data_file=data_file, bins=bins),
+                search_kwargs=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
+                clf_fit_fn=clf_fit_fn,
+                target_class=1,
+                get_expansions_fn=get_expansions_fn,
+                get_expansions_kwargs=dict(expand_quantized_fn=expand_quantized),
+                baseline_dataset_find_examples_fn=baseline_detaset_find_examples_fn,
+                logger=logger,
+                random_state=SEED,
+            )
+
+            result["bins"] = bins
+            result["epsilon"] = epsilon
+            result["p_norm"] = p_norm
+            result["q_norm"] = q_norm
+
+            results.append(result)
+
+    output_file = "out/credit_3.pickle"
+    logger.info("Saving output to {}.".format(output_file))
+
+    with open(output_file, 'wb') as f:
+        pickle.dump(results, f)
