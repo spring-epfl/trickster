@@ -258,19 +258,17 @@ def goal_fn(x):
 def heuristic_fn(x):
     """Distance to the decision boundary of a logistic regression classifier.
 
-    By default the distance is w.r.t. L1 norm. This means that the denominator
-    has to be in terms of the Holder dual norm (`q_norm`), so L-inf. I know,
-    this interface is horrible.
-
     NOTE: The value has to be zero if the example is already on the target side
     of the boundary.
     """
     search_params = SearchParams.get_default()
     score = search_params.clf.decision_function([x.features])[0]
-    if score >= 0:
+    if score >= 0 and search_params.target_class == 1:
+        return 0.0
+    if score <= 0 and search_params.target_class == 0:
         return 0.0
     h = np.abs(score) / np.linalg.norm(
-        search_params.clf.coef_, ord=search_params.q_norm
+        search_params.clf.coef_[0], ord=search_params.q_norm
     )
     return search_params.epsilon * h
 

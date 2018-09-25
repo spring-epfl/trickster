@@ -96,6 +96,7 @@ def test_generation(file_factory, trained_model_pickle):
             data_path=DATA_PATH,
             output_pickle=results_file.name,
             # Let's make the task easy.
+            epsilon=10,
             num_adv_examples=1,
             confidence_level=0.1,
             iter_lim=10,
@@ -105,8 +106,8 @@ def test_generation(file_factory, trained_model_pickle):
         results = pd.read_pickle(results_file.name)
 
     # One example is expected to be found.
-    assert len(results) == 1
     assert results.found.mean() == 1.0
+    assert len(results) == 1
 
 
 def test_generation_sort_by_len(file_factory, trained_model_pickle):
