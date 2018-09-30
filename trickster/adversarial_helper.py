@@ -13,6 +13,7 @@ from trickster.search import a_star_search
 from trickster.expansion import expand
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegressionCV
+from scipy import stats
 from scipy.sparse import issparse
 
 from collections import Counter as CollectionsCounter
@@ -555,6 +556,13 @@ def experiment_wrapper(
                 search_funcs=search_funcs,
             )
 
+    # Compute average robustness of the correctly-classifier examples.
+    correctly_classified = X_test[clf.predict(X_test) == y_test]
+    scores = clf.decision_function(correctly_classified)
+    grad = clf.coef_[0]
+    grad_norm = np.linalg.norm(grad, ord=search_params.q_norm)
+    robustness = np.abs(scores) / grad_norm
+
     # Output result.
     result = {
         "feature_count": X.shape[1],
@@ -573,8 +581,10 @@ def experiment_wrapper(
         "avg_real_cost": search_results["real_cost"].mean(),
         "avg_counter": search_results["nodes_expanded"].mean(),
         "avg_runtime": search_results["runtime"].mean(),
+        "avg_robustness": robustness.mean(),
         "baseline_results": baseline_results,
         "search_results": search_results,
     }
 
     return result
+
