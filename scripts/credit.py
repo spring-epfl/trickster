@@ -125,9 +125,9 @@ if __name__ == "__main__":
     data_file = "notebooks/data/german_credit_data.csv"
 
     # Define the meta-experiment parameters.
-    bin_counts = np.arange(5, 101, 5)
+    bin_counts = [5, 50] + list(range(100, 1001, 100))
     p_norm, q_norm = 1, np.inf
-    epsilons = [1, 2, 3, 5, 10]
+    epsilons = [0, 1, 2.5, 5, 10e+5]
 
     results = []
 
@@ -161,8 +161,9 @@ if __name__ == "__main__":
 
             results.append(result)
 
-    output_file = "out/credit_3.pickle"
+    output_file = "out/credit.pickle"
     logger.info("Saving output to {}.".format(output_file))
 
     with open(output_file, 'wb') as f:
         pickle.dump(results, f)
+
