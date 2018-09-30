@@ -11,6 +11,12 @@ Install the required Python packages:
 pip install -r requirements.txt
 ```
 
+### System packages
+On Ubuntu, you need these:
+```
+apt install parallel unzip
+```
+
 ### Data
 
 To download the datasets, run this:
