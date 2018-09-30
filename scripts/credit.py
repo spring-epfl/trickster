@@ -136,11 +136,15 @@ if __name__ == "__main__":
 
     for epsilon in epsilons:
 
-        logger.info("Loading and preprocessing input data for epsilon: {}...".format(epsilon))
+        logger.info(
+            "Loading and preprocessing input data for epsilon: {}...".format(epsilon)
+        )
 
         for bins in bin_counts:
 
-            logger.info("Loading and preprocessing input data for {} bins...".format(bins))
+            logger.info(
+                "Loading and preprocessing input data for {} bins...".format(bins)
+            )
             result = experiment_wrapper(
                 load_transform_data_fn=load_transform_data_fn,
                 load_kwargs=dict(data_file=data_file, bins=bins),
@@ -164,6 +168,5 @@ if __name__ == "__main__":
     output_file = "out/credit.pickle"
     logger.info("Saving output to {}.".format(output_file))
 
-    with open(output_file, 'wb') as f:
+    with open(output_file, "wb") as f:
         pickle.dump(results, f)
-

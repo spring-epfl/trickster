@@ -23,6 +23,7 @@ from sklearn.linear_model import LogisticRegressionCV
 SEED = 1
 np.random.seed(seed=SEED)
 
+
 def _transform_source_identity(X_k):
     """
     Helper to transform the source_identity field.
@@ -42,6 +43,7 @@ def _transform_source_identity(X_k):
             X_k_transformed[i, item] = 1
 
     return X_k_transformed
+
 
 def load_transform_data_fn(human_dataset, bot_dataset, drop_features, bins, **kwargs):
     """
@@ -91,14 +93,15 @@ def load_transform_data_fn(human_dataset, bot_dataset, drop_features, bins, **kw
     df = pd.get_dummies(df)
 
     # Separate features from targets
-    df_X = df.drop('is_bot', axis=1)
-    df_y = df['is_bot']
+    df_X = df.drop("is_bot", axis=1)
+    df_y = df["is_bot"]
 
     # Convert to numpy.
     X = df_X.values.astype("float")
     y = df_y.values.astype("float")
 
     return X, y, df_X.columns
+
 
 def clf_fit_fn(X_train, y_train, **kwargs):
     """
@@ -143,23 +146,39 @@ def get_expansions_fn(features, **kwargs):
 
     # Concatenate indexes of transformable features.
     transformable_feature_idxs = sorted(
-        idxs_source_identity + idxs_tweeted + idxs_retweeted + idxs_favourited +
-        idxs_replied + idxs_likes_per_tweet + idxs_retweets_per_tweet +
-        idxs_lists + idxs_age_of_account + idxs_sources_count + idxs_urls +
-        idxs_cdn_content
+        idxs_source_identity
+        + idxs_tweeted
+        + idxs_retweeted
+        + idxs_favourited
+        + idxs_replied
+        + idxs_likes_per_tweet
+        + idxs_retweets_per_tweet
+        + idxs_lists
+        + idxs_age_of_account
+        + idxs_sources_count
+        + idxs_urls
+        + idxs_cdn_content
     )
     reduced_features = features[transformable_feature_idxs]
 
     # Find indexes of required features in the reduced feature space.
-    idxs_source_identity = find_substring_occurences(reduced_features, "source_identity")
+    idxs_source_identity = find_substring_occurences(
+        reduced_features, "source_identity"
+    )
     idxs_tweeted = find_substring_occurences(reduced_features, "user_tweeted")
     idxs_retweeted = find_substring_occurences(reduced_features, "user_retweeted")
     idxs_favourited = find_substring_occurences(reduced_features, "user_favourited")
     idxs_replied = find_substring_occurences(reduced_features, "user_replied")
-    idxs_likes_per_tweet = find_substring_occurences(reduced_features, "likes_per_tweet")
-    idxs_retweets_per_tweet = find_substring_occurences(reduced_features, "retweets_per_tweet")
+    idxs_likes_per_tweet = find_substring_occurences(
+        reduced_features, "likes_per_tweet"
+    )
+    idxs_retweets_per_tweet = find_substring_occurences(
+        reduced_features, "retweets_per_tweet"
+    )
     idxs_lists = find_substring_occurences(reduced_features, "lists_per_user")
-    idxs_age_of_account = find_substring_occurences(reduced_features, "age_of_account_in_days")
+    idxs_age_of_account = find_substring_occurences(
+        reduced_features, "age_of_account_in_days"
+    )
     idxs_sources_count = find_substring_occurences(reduced_features, "sources_count")
     idxs_urls = find_substring_occurences(reduced_features, "urls_count")
     idxs_cdn_content = find_substring_occurences(reduced_features, "cdn_content_in_kb")
@@ -171,13 +190,13 @@ def get_expansions_fn(features, **kwargs):
         (idxs_retweeted, expand_quantized),
         (idxs_favourited, expand_quantized),
         (idxs_replied, expand_quantized),
-        (idxs_likes_per_tweet,expand_quantized),
+        (idxs_likes_per_tweet, expand_quantized),
         (idxs_retweets_per_tweet, expand_quantized),
         (idxs_lists, expand_quantized),
         (idxs_age_of_account, expand_quantized_increment),
         (idxs_sources_count, expand_quantized),
         (idxs_urls, expand_quantized),
-        (idxs_cdn_content, expand_quantized)
+        (idxs_cdn_content, expand_quantized),
     ]
 
     return expansions, transformable_feature_idxs
@@ -197,7 +216,7 @@ if __name__ == "__main__":
     logger = setup_custom_logger(log_file)
 
     # Perform experiments for different popularity bands.
-    popularity_bands = ['1k', '100k', '1M', '10M']
+    popularity_bands = ["1k", "100k", "1M", "10M"]
 
     for popularity_band in popularity_bands:
 
@@ -214,7 +233,7 @@ if __name__ == "__main__":
         drop_features = [
             "follower_friend_ratio",
             "tweet_frequency",
-            "favourite_tweet_ratio"
+            "favourite_tweet_ratio",
         ]
 
         results = []
@@ -224,14 +243,25 @@ if __name__ == "__main__":
 
         for epsilon in epsilons:
 
-            logger.info("Loading and preprocessing input data for epsilon: {}...".format(epsilon))
+            logger.info(
+                "Loading and preprocessing input data for epsilon: {}...".format(
+                    epsilon
+                )
+            )
 
             for bins in bin_counts:
 
-                logger.info("Loading and preprocessing input data for {} bins...".format(bins))
+                logger.info(
+                    "Loading and preprocessing input data for {} bins...".format(bins)
+                )
                 result = experiment_wrapper(
                     load_transform_data_fn=load_transform_data_fn,
-                    load_kwargs=dict(human_dataset=human_dataset, bot_dataset=bot_dataset, drop_features=drop_features, bins=bins),
+                    load_kwargs=dict(
+                        human_dataset=human_dataset,
+                        bot_dataset=bot_dataset,
+                        drop_features=drop_features,
+                        bins=bins,
+                    ),
                     search_kwargs=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
                     clf_fit_fn=clf_fit_fn,
                     target_class=0,
@@ -251,5 +281,5 @@ if __name__ == "__main__":
         output_file = "out/bots_{}.pickle".format(popularity_band)
         logger.info("Saving output to {}.".format(output_file))
 
-        with open(output_file, 'wb') as f:
+        with open(output_file, "wb") as f:
             pickle.dump(results, f)

@@ -38,7 +38,7 @@ def expand_quantized_decrement(sample, feat_idxs):
     """
     if len(feat_idxs) == 0:
         return []
-        
+
     sub_sample = sample[feat_idxs]
     idx = np.argmax(sub_sample)
     children = []
