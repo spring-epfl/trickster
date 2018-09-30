@@ -221,8 +221,8 @@ if __name__ == "__main__":
     for popularity_band in popularity_bands:
 
         # Define dataset locations.
-        human_dataset = "data/twitter_bots/humans.{}.csv".format(popularity_band)
-        bot_dataset = "data/twitter_bots/bots.{}.csv".format(popularity_band)
+        human_dataset = "data/twitter_bots/humans/humans.{}.csv".format(popularity_band)
+        bot_dataset = "data/twitter_bots/bots/bots.{}.csv".format(popularity_band)
 
         # Define the meta-experiment parameters.
         bin_counts = np.arange(5, 101, 5)

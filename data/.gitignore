@@ -1,1 +1,3 @@
-knndata
+*
+!.gitignore
+!wfp_toy_traces
