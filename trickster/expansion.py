@@ -93,7 +93,7 @@ def expand_categorical(sample, feat_idxs):
 
 def expand_collection_set(sample, feat_idxs):
     """
-    Expand all values of a collection of categorical features (set 0 to 1).
+    Expand all values of a collection of categorical features (set [0,1] to [1,0]).
 
     :param sample: Initial node.
     :type sample: numpy array.
@@ -103,11 +103,16 @@ def expand_collection_set(sample, feat_idxs):
     """
     children = []
 
-    for idx in feat_idxs:
+    for i, idx in enumerate(feat_idxs):
+
+        # Skip 'absence' features.
+        if i % 2 != 0:
+            continue
 
         if sample[idx] == 0:
             child = np.array(sample)
             child[idx] = 1
+            child[idx+1] = 0
             children.append(child)
 
     return children
@@ -115,7 +120,7 @@ def expand_collection_set(sample, feat_idxs):
 
 def expand_collection_reset(sample, feat_idxs):
     """
-    Expand all values of a collection of categorical features (reset 1 to 0).
+    Expand all values of a collection of categorical features (reset [1,0] to [0,1]).
 
     :param sample: Initial node.
     :type sample: numpy array.
@@ -125,11 +130,16 @@ def expand_collection_reset(sample, feat_idxs):
     """
     children = []
 
-    for idx in feat_idxs:
+    for i, idx in enumerate(feat_idxs):
 
-        if sample[idx] == 1:
+        # Skip 'presence' features.
+        if i % 2 == 0:
+            continue
+
+        if sample[idx] == 0:
             child = np.array(sample)
-            child[idx] = 0
+            child[idx] = 1
+            child[idx-1] = 0
             children.append(child)
 
     return children

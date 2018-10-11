@@ -24,23 +24,23 @@ SEED = 1
 np.random.seed(seed=SEED)
 
 
-def _transform_source_identity(X_k):
+def _transform_source_identity(X_k, sources_count=7):
     """
     Helper to transform the source_identity field.
     """
     X_k = X_k.apply(lambda x: x.replace(";", ","))
     X_k = X_k.apply(ast.literal_eval)
 
-    # Get the value of the maximum element in X_k.
-    arg_max = np.max([item for sublist in X_k.values.tolist() for item in sublist])
+    N, K = X_k.shape[0], sources_count * 2
+    X_k_transformed = np.zeros((N, K), dtype="intc")
 
-    N = X_k.shape[0]
-    X_k_transformed = np.zeros((N, arg_max + 1), dtype="intc")
-
-    # Set 1 if the source is present for the user.
+    # Set (1, 0) if the source is present for the user and (0, 1) if absent.
     for i in range(N):
-        for item in X_k[i]:
-            X_k_transformed[i, item] = 1
+        for j in range(sources_count):
+            if j in X_k[i]:
+                X_k_transformed[i, j*2] = 1
+            else:
+                X_k_transformed[i, j*2+1] = 1
 
     return X_k_transformed
 
@@ -82,12 +82,20 @@ def load_transform_data_fn(human_dataset, bot_dataset, drop_features, bins, **kw
     transformed = _transform_source_identity(df.loc[:, "source_identity"])
     df = df.drop("source_identity", axis=1)
 
-    df["source_identity_other"] = transformed[:, 0]
-    df["source_identity_browser"] = transformed[:, 1]
-    df["source_identity_mobile"] = transformed[:, 2]
-    df["source_identity_osn"] = transformed[:, 3]
-    df["source_identity_automation"] = transformed[:, 4]
-    df["source_identity_marketing"] = transformed[:, 5]
+    df["source_identity_other_present"] = transformed[:, 0]
+    df["source_identity_other_absent"] = transformed[:, 1]
+    df["source_identity_browser_present"] = transformed[:, 2]
+    df["source_identity_browser_absent"] = transformed[:, 3]
+    df["source_identity_mobile_present"] = transformed[:, 4]
+    df["source_identity_mobile_absent"] = transformed[:, 5]
+    df["source_identity_osn_present"] = transformed[:, 6]
+    df["source_identity_osn_absent"] = transformed[:, 7]
+    df["source_identity_automation_present"] = transformed[:, 8]
+    df["source_identity_automation_absent"] = transformed[:, 9]
+    df["source_identity_marketing_present"] = transformed[:, 10]
+    df["source_identity_marketing_absent"] = transformed[:, 11]
+    df["source_identity_news_present"] = transformed[:, 12]
+    df["source_identity_news_absent"] = transformed[:, 13]
 
     # Perform one-hot encoding
     df = pd.get_dummies(df)
@@ -202,7 +210,7 @@ def get_expansions_fn(features, **kwargs):
     return expansions, transformable_feature_idxs
 
 
-def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
+def baseline_dataset_find_examples_fn(search_funcs=None, **kwargs):
     """Perform BFS adversarial example search to baseline against A* search."""
     search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
     results = dataset_find_adversarial_examples(search_funcs=search_funcs, **kwargs)
@@ -221,13 +229,13 @@ if __name__ == "__main__":
     for popularity_band in popularity_bands:
 
         # Define dataset locations.
-        human_dataset = "data/twitter_bots/humans/humans.{}.csv".format(popularity_band)
-        bot_dataset = "data/twitter_bots/bots/bots.{}.csv".format(popularity_band)
+        human_dataset = "data/twitter_bots/humans.{}.csv".format(popularity_band)
+        bot_dataset = "data/twitter_bots/bots.{}.csv".format(popularity_band)
 
         # Define the meta-experiment parameters.
         bin_counts = np.arange(5, 101, 5)
         p_norm, q_norm = 1, np.inf
-        epsilons = [1, 2, 3, 5, 10]
+        epsilons = [1, 5, 10, 25, 50, 100, 150, 250]
 
         # Define features that will be removed.
         drop_features = [
@@ -265,8 +273,9 @@ if __name__ == "__main__":
                     search_kwargs=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
                     clf_fit_fn=clf_fit_fn,
                     target_class=0,
+                    target_confidence=0.5,
                     get_expansions_fn=get_expansions_fn,
-                    baseline_dataset_find_examples_fn=baseline_detaset_find_examples_fn,
+                    baseline_dataset_find_examples_fn=baseline_dataset_find_examples_fn,
                     logger=logger,
                     random_state=SEED,
                 )

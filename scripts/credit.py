@@ -108,7 +108,7 @@ def get_expansions_fn(features, expand_quantized_fn, **kwargs):
     return expansions, transformable_feature_idxs
 
 
-def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
+def baseline_dataset_find_examples_fn(search_funcs=None, **kwargs):
     """Perform BFS adversarial example search to baseline against A* search."""
     search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
     results = dataset_find_adversarial_examples(search_funcs=search_funcs, **kwargs)
@@ -153,7 +153,7 @@ if __name__ == "__main__":
                 target_class=1,
                 get_expansions_fn=get_expansions_fn,
                 get_expansions_kwargs=dict(expand_quantized_fn=expand_quantized),
-                baseline_dataset_find_examples_fn=baseline_detaset_find_examples_fn,
+                baseline_dataset_find_examples_fn=baseline_dataset_find_examples_fn,
                 logger=logger,
                 random_state=SEED,
             )
