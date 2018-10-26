@@ -112,15 +112,15 @@ def expand_collection_set(sample, feat_idxs):
         if sample[idx] == 0:
             child = np.array(sample)
             child[idx] = 1
-            child[idx+1] = 0
+            child[idx + 1] = 0
             children.append(child)
 
     return children
 
 
-def expand_collection_reset(sample, feat_idxs):
+def expand_collection_unset(sample, feat_idxs):
     """
-    Expand all values of a collection of categorical features (reset [1,0] to [0,1]).
+    Expand all values of a collection of categorical features (unset [1,0] to [0,1]).
 
     :param sample: Initial node.
     :type sample: numpy array.
@@ -139,7 +139,7 @@ def expand_collection_reset(sample, feat_idxs):
         if sample[idx] == 0:
             child = np.array(sample)
             child[idx] = 1
-            child[idx-1] = 0
+            child[idx - 1] = 0
             children.append(child)
 
     return children
@@ -147,7 +147,7 @@ def expand_collection_reset(sample, feat_idxs):
 
 def expand_collection(sample, feat_idxs):
     """
-    Expand all values of a collection of categorical features (set and reset).
+    Expand all values of a collection of categorical features (set and unset).
 
     :param sample: Initial node.
     :type sample: numpy array.
@@ -158,7 +158,7 @@ def expand_collection(sample, feat_idxs):
     children = []
 
     children.extend(expand_collection_set(sample, feat_idxs))
-    children.extend(expand_collection_reset(sample, feat_idxs))
+    children.extend(expand_collection_unset(sample, feat_idxs))
 
     return children
 
