@@ -210,7 +210,12 @@ def get_expansions_fn(features, **kwargs):
     return expansions, transformable_feature_idxs
 
 
+<<<<<<< HEAD
 def baseline_dataset_find_examples_fn(search_funcs=None, **kwargs):
+=======
+# Not used.
+def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
+>>>>>>> Update scripts and notebooks
     """Perform BFS adversarial example search to baseline against A* search."""
     search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
     results = dataset_find_adversarial_examples(search_funcs=search_funcs, **kwargs)
@@ -235,7 +240,7 @@ if __name__ == "__main__":
         # Define the meta-experiment parameters.
         bin_counts = np.arange(5, 101, 5)
         p_norm, q_norm = 1, np.inf
-        epsilons = [1, 5, 10, 25, 50, 100, 150, 250]
+        epsilons = [0, 1, 2, 3, 5, 10, 100, 500, 1000, 5000]
 
         # Define features that will be removed.
         drop_features = [
@@ -247,7 +252,7 @@ if __name__ == "__main__":
         results = []
 
         # Perform the experiments.
-        logger.info("Starting experiments for the twitter bot dataset.")
+        logger.info("Starting experiments for the Twitter bot dataset.")
 
         for epsilon in epsilons:
 
@@ -258,7 +263,6 @@ if __name__ == "__main__":
             )
 
             for bins in bin_counts:
-
                 logger.info(
                     "Loading and preprocessing input data for {} bins...".format(bins)
                 )
@@ -275,7 +279,6 @@ if __name__ == "__main__":
                     target_class=0,
                     target_confidence=0.5,
                     get_expansions_fn=get_expansions_fn,
-                    baseline_dataset_find_examples_fn=baseline_dataset_find_examples_fn,
                     logger=logger,
                     random_state=SEED,
                 )
@@ -292,3 +295,4 @@ if __name__ == "__main__":
 
         with open(output_file, "wb") as f:
             pickle.dump(results, f)
+
