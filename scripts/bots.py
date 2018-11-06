@@ -16,7 +16,7 @@ import ast
 
 from trickster.search import a_star_search, ida_star_search
 from trickster.adversarial_helper import *
-from trickster.expansion import *
+from trickster.expansions import *
 from sklearn.linear_model import LogisticRegressionCV
 
 

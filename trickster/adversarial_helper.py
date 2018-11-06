@@ -9,8 +9,6 @@ import numpy as np
 import pandas as pd
 import logging
 
-from trickster.search import a_star_search
-from trickster.expansion import expand
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegressionCV
 from scipy import stats
@@ -20,6 +18,9 @@ from collections import Counter as CollectionsCounter
 from defaultcontext import with_default_context
 from profiled import Profiler, profiled
 from tqdm import tqdm
+
+from trickster.search import a_star_search
+from trickster.expansions import expand
 
 # Handle global variables.
 LOGGER_NAME = "adversarial"
@@ -118,7 +119,6 @@ def create_reduced_classifier(clf, x, transformable_feature_idxs):
     return clf_reduced
 
 
-# Define useful helper classes.
 class CounterLimitExceededError(Exception):
     pass
 
@@ -424,10 +424,6 @@ def dataset_find_adversarial_examples(
 
     return results
 
-
-###########################################
-###########################################
-###########################################
 
 # Define a wrapper function to perform experiments.
 def experiment_wrapper(

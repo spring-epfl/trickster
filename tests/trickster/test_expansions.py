@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from trickster.expansion import *
+from trickster.expansions import *
 
 # Feature vector for quantized or categorical features.
 A = np.array([0, 0, 0, 1, 0, 0, 0])

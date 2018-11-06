@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Experiment with generating adversarial examples for a fingerprinting classifier
+Experiment with generating adversarial examples for a website fingerprinting classifier
 implemented as a logistic regression on top of CUMUL features.
 """
 
