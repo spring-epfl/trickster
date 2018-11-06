@@ -1,9 +1,8 @@
 """
-Generic website fingerprinting utilities: feature extraction, and dataset loading.
+Website fingerprinting utilities: feature extraction and 'knndata' dataset loading.
 """
 
 import os
-import sys
 import random
 
 import numpy as np
@@ -286,3 +285,4 @@ def insert_dummy_packets(trace, index, num_dummies=1):
         return None
     extended = trace[:index] + [1] * num_dummies + trace[index:]
     return extended
+

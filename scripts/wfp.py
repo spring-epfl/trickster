@@ -25,8 +25,8 @@ from trickster.search import a_star_search
 from trickster.adversarial_helper import ExpansionCounter
 from trickster.adversarial_helper import AdversarialExampleParams, SearchFuncs
 from trickster.adversarial_helper import find_adversarial_example
-from trickster.wfp_helper import extract, pad_and_onehot, load_data
-from trickster.wfp_helper import insert_dummy_packets
+from trickster.domain.wfp import extract, pad_and_onehot, load_data
+from trickster.domain.wfp import insert_dummy_packets
 from trickster.utils.log import LOGGER_NAME, setup_custom_logger
 from trickster.utils.cli import add_options
 
