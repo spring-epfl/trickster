@@ -3,6 +3,7 @@
 ## Running tests
 
 ```
+export PYTHONPATH=.
 pytest
 ```
 

@@ -27,6 +27,7 @@ make data
 
 The datasets include:
 * Tao Wang's [website fingerprinting](https://www.cse.ust.hk/~taow/wf/data/) "knndata"
+* Zafar Gilani's [Twitter bot classification dataset](https://www.cl.cam.ac.uk/~szuhg2/data.html)
 
 ## Scripts
 
