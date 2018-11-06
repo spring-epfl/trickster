@@ -23,12 +23,11 @@ import pandas as pd
 
 from trickster.search import a_star_search
 from trickster.adversarial_helper import ExpansionCounter
-from trickster.adversarial_helper import SearchParams, SearchFuncs
+from trickster.adversarial_helper import AdversarialExampleParams, SearchFuncs
 from trickster.adversarial_helper import find_adversarial_example
-from trickster.adversarial_helper import setup_custom_logger
-from trickster.adversarial_helper import LOGGER_NAME
 from trickster.wfp_helper import extract, pad_and_onehot, load_data
 from trickster.wfp_helper import insert_dummy_packets
+from trickster.utils.log import LOGGER_NAME, setup_custom_logger
 from trickster.utils.cli import add_options
 
 from tqdm import tqdm
@@ -247,7 +246,7 @@ class TraceNode:
 @profiled
 def goal_fn(x):
     """Tell whether the example has reached the goal."""
-    search_params = SearchParams.get_default()
+    search_params = AdversarialExampleParams.get_default()
     return (
         search_params.clf.predict_proba([x.features])[0, search_params.target_class]
         >= search_params.target_confidence
@@ -261,7 +260,7 @@ def heuristic_fn(x):
     NOTE: The value has to be zero if the example is already on the target side
     of the boundary.
     """
-    search_params = SearchParams.get_default()
+    search_params = AdversarialExampleParams.get_default()
     score = search_params.clf.decision_function([x.features])[0]
     if score >= 0 and search_params.target_class == 1:
         return 0.0
@@ -276,7 +275,7 @@ def heuristic_fn(x):
 @profiled
 def expand_fn(x):
     children = x.expand()
-    search_params = SearchParams.get_default()
+    search_params = AdversarialExampleParams.get_default()
     costs = [
         np.linalg.norm(np.array(x.features - c.features), ord=search_params.p_norm)
         for c in children
@@ -366,7 +365,7 @@ def run_wfp_experiment(
         q_norm = 1
 
     # Set the global search parameters.
-    search_params = SearchParams(
+    search_params = AdversarialExampleParams(
         clf=clf,
         target_class=1,
         target_confidence=target_confidence,
@@ -374,7 +373,7 @@ def run_wfp_experiment(
         q_norm=q_norm,
         epsilon=epsilon,
     )
-    SearchParams.set_global_default(search_params)
+    AdversarialExampleParams.set_global_default(search_params)
 
     # Set the A* search functions.
     node_params = dict(

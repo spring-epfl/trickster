@@ -1,13 +1,16 @@
-# Ignore warnings.
-import sys
-import warnings
+"""
+Generic utils.
+"""
 
+# Ignore warnings.
+import warnings
 warnings.filterwarnings("ignore")
+
+import logging
 
 import attr
 import numpy as np
 import pandas as pd
-import logging
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegressionCV
@@ -21,32 +24,7 @@ from tqdm import tqdm
 
 from trickster.search import a_star_search
 from trickster.expansions import expand
-
-# Handle global variables.
-LOGGER_NAME = "adversarial"
-
-
-def setup_custom_logger(log_file="log/output.log"):
-    """Set up a logger object to print info to stdout and debug to file."""
-    logger = logging.getLogger(LOGGER_NAME)
-    logger.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter(
-        fmt="[%(asctime)s - %(levelname)-4s] >> %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    handler = logging.FileHandler(log_file, mode="a")
-    handler.setLevel(logging.DEBUG)
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-    handler = logging.StreamHandler(stream=sys.stdout)
-    handler.setLevel(logging.INFO)
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-    return logger
+from trickster.utils.log import LOGGER_NAME, setup_custom_logger
 
 
 def get_feature_coef_importance(X, clf, transformable_feature_idxs):
@@ -91,12 +69,27 @@ def find_substring_occurences(xs, item):
     [1, 2]
 
     """
+
     idxs = [i for (i, x) in enumerate(xs) if item in x]
     return idxs
 
 
-def create_reduced_classifier(clf, x, transformable_feature_idxs):
-    """Construct a reduced classifier based on the original one."""
+def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
+    """Construct a reduced-dimension classifier based on the original one for a given example.
+
+    The reduced-dimension classifier should behave the same way as the original one, but operate in
+    a smaller feature space. This is done by fixing the score of the classifier on a static part of
+    ``x``, and integrating it into the bias parameter of the reduced classifier.
+
+    For example, let $x = [1, 2, 3]$, weights of the classifier $w = [1, 1, 1]$ and bias term $b =
+    0$, and the only transformable feature index is 0. Then the reduced classifier has weights $w' =
+    [1]$, and the bias term incorporates the non-transformable part of $x$: $b' = -1 \cdot 2 + 1
+    \cdot 3$.
+
+    :param clf: Original logistic regression classifier
+    :param x: An example
+    :param transformable_feature_idxs: List of features that can be changed in the given example.
+    """
 
     # Establish non-transformable feature indexes.
     feature_idxs = np.arange(x.size)
@@ -144,7 +137,12 @@ class ExpansionCounter:
 
 
 class Node(object):
-    """Single node in a transformation graph."""
+    """Single node in a transformation graph.
+
+    :param src: `Raw` example
+    :param feature_extract_fn: Feature extraction funcion
+    :param depth: Number of hops from the original example
+    """
 
     def __init__(self, x, depth=0, feature_extract_fn=None):
         self.src = x
@@ -153,6 +151,7 @@ class Node(object):
 
     @property
     def features(self):
+        """Return the feature vector."""
         if hasattr(self, "_features"):
             return self._features
 
@@ -163,6 +162,7 @@ class Node(object):
             return self._features
 
     def expand(self, expansions):
+        """Return the expanded neighbour nodes."""
         children = []
 
         # Increment the counter of expanded nodes.
@@ -187,11 +187,10 @@ class Node(object):
         return self.src == other.src
 
 
-# Functions that perform adversarial example search.
 @with_default_context
 @attr.s
-class SearchParams:
-    """Parameters for a single search instance."""
+class AdversarialExampleParams:
+    """Parameters for a single adversarial example search instance."""
 
     clf = attr.ib()
     expansions = attr.ib(default=attr.Factory(list))
@@ -207,7 +206,7 @@ def default_expand_fn(x):
     """Expand x and compute the costs.
     Returns a list of tuples (child, cost)
     """
-    search_params = SearchParams.get_default()
+    search_params = AdversarialExampleParams.get_default()
     children = x.expand(search_params.expansions)
     costs = [np.linalg.norm(x.src - c.src, ord=search_params.p_norm) for c in children]
 
@@ -217,7 +216,7 @@ def default_expand_fn(x):
 @profiled
 def default_goal_fn(x):
     """Tell whether the example has reached the goal."""
-    search_params = SearchParams.get_default()
+    search_params = AdversarialExampleParams.get_default()
     return (
         search_params.clf.predict_proba([x.src])[0, search_params.target_class]
         >= search_params.target_confidence
@@ -233,7 +232,7 @@ def default_heuristic_fn(x):
     NOTE: The value has to be zero if the example is already on the target side
     of the boundary.
     """
-    search_params = SearchParams.get_default()
+    search_params = AdversarialExampleParams.get_default()
     confidence = search_params.clf.predict_proba([x.src])[0, search_params.target_class]
     if confidence >= search_params.target_confidence:
         return 0.0
@@ -256,14 +255,26 @@ def default_example_wrapper_fn(x):
     return Node(x)
 
 
+@profiled
 def default_real_cost_fn(x, another):
     """Real cost for transforming example into another one."""
-    search_params = SearchParams.get_default()
+    search_params = AdversarialExampleParams.get_default()
     return np.linalg.norm(x.src - another.src, ord=search_params.p_norm)
 
 
 @attr.s
 class SearchFuncs:
+    """
+    Functions that define the graph search instance.
+
+    :param example_wrapper_fn: Is called on each node after expansion.
+            If input examples are `raw`, e.g., numpy arrays, this function can be used to wrap the examples
+            in a :py:class:`Node` class.
+    :param expand_fn: Returns the expanded neighbour nodes for a given node.
+    :param goal_fn: Predicate that tells whether a given node is a target node.
+    :param heuristic_fn: Returns an estimate of how far the given example
+    """
+
     example_wrapper_fn = attr.ib(
         default=attr.Factory(lambda: default_example_wrapper_fn)
     )
@@ -301,7 +312,22 @@ def dataset_find_adversarial_examples(
     counter_kwargs=None,
     **kwargs
 ):
-    """Find adversarial examples for specified indexes."""
+    """Find adversarial examples for specified indexes, and record statistics for reports.
+
+    :param dataset: Numpy datasets (X, y)
+    :param idxs: Example indices
+    :param search_fn: Graph search function
+    :param SearchFuncs search_funcs: Search functions
+    :param transformable_feature_idxs: Indexes of feature that can be transformed
+    :param counter_kwargs: Paramters passed to the :py:class:`ExpansionCounter`
+
+    The kwargs are passed directly to the search function call.
+
+    .. note::
+
+        `transformable_feature_idxs` only works if the target model is logistic regression.
+
+    """
     logger = logging.getLogger(LOGGER_NAME)
     counter_kwargs = counter_kwargs or {}
 
@@ -335,10 +361,10 @@ def dataset_find_adversarial_examples(
         if issparse(orig_example):
             orig_example = orig_example.toarray()
 
-        # Transform x and the classifier to operate in the reduced feature space.
-        orig_search_params = SearchParams.get_default()
+        # If transformable_feature_idxs is specified, transform x and the classifier to operate in the reduced feature space.
+        orig_search_params = AdversarialExampleParams.get_default()
         if transformable_feature_idxs is not None:
-            clf_reduced = create_reduced_classifier(
+            clf_reduced = create_reduced_linear_classifier(
                 orig_search_params.clf, orig_example, transformable_feature_idxs
             )
             example = orig_example[transformable_feature_idxs]
@@ -358,6 +384,7 @@ def dataset_find_adversarial_examples(
 
         with per_example_profiler.as_default(), expanded_counter.as_default(), search_params.as_default():
             try:
+                # Find the adversarial example.
                 x_adv_reduced, path_costs, optimal_path = find_adversarial_example(
                     example=example,
                     search_fn=search_fn,
@@ -372,16 +399,24 @@ def dataset_find_adversarial_examples(
                     path_cost = path_costs[search_funcs.hash_fn(x_adv_reduced)]
 
             except CounterLimitExceededError as e:
-                logger.debug("WARN! For example at index {}: {}".format(idx, e))
+                logger.debug("For example at index {}: {}".format(idx, e))
 
         # Record some basic statistics.
+        # - Number of node expansions.
         nodes_expanded = expanded_counter.count
+
+        # Initial confidence.
         init_confidence = clf_reduced.predict_proba([example])[
             0, search_params.target_class
         ]
+
+        # Expansion functions used.
         expands = [(idxs, fn.__name__) for (idxs, fn) in search_params.expansions]
+
+        # Runtime statistics.
         runtime_stats = per_example_profiler.compute_stats()
         if "find_adversarial_example" in runtime_stats:
+            # Total time spent in the `find_adversarial_example` function.
             runtime = runtime_stats["find_adversarial_example"]["tot"]
 
         if x_adv_reduced is not None:
@@ -425,7 +460,6 @@ def dataset_find_adversarial_examples(
     return results
 
 
-# Define a wrapper function to perform experiments.
 def experiment_wrapper(
     load_transform_data_fn,
     clf_fit_fn,
@@ -444,9 +478,17 @@ def experiment_wrapper(
     test_size=0.1,
 ):
     """
-    A wrapper designed to find adversarial examples for different application domains.
+    Experiment runner design to be more or less domain-independent.
 
-    One experiment finds adversarial examples for one model and a dataset.
+    An experiment finds adversarial examples for a given model and a given dataset.
+
+    :param load_transform_data_fn: A function that returns ``(X, y, features)``.
+    :param clf_fit_fn: A function that returns a trained target model.
+    :param target_confidence: Target confidence level for adversarial examples.
+    :param confidence_margin: Allows to only pick initial examples that are this far away from the target confidence.
+    :param SearchFuncs search_funcs: Search functions.
+    :param search_kwargs: Parameters passed to the search function.
+    :
     """
     search_kwargs = search_kwargs or {}
     load_kwargs = load_kwargs or {}
@@ -512,7 +554,7 @@ def experiment_wrapper(
             len(idxs)
         )
     )
-    search_params = SearchParams(
+    search_params = AdversarialExampleParams(
         clf=clf,
         expansions=expansions,
         target_class=target_class,

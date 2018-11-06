@@ -38,9 +38,9 @@ def _transform_source_identity(X_k, sources_count=7):
     for i in range(N):
         for j in range(sources_count):
             if j in X_k[i]:
-                X_k_transformed[i, j*2] = 1
+                X_k_transformed[i, j * 2] = 1
             else:
-                X_k_transformed[i, j*2+1] = 1
+                X_k_transformed[i, j * 2 + 1] = 1
 
     return X_k_transformed
 
@@ -291,4 +291,3 @@ if __name__ == "__main__":
 
         with open(output_file, "wb") as f:
             pickle.dump(results, f)
-

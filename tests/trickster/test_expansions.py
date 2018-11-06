@@ -132,4 +132,3 @@ def test_expand_collection_unset(a, feat_idxs, expected):
 def test_expand_collection(a, feat_idxs, expected):
     children = expand_collection(a, feat_idxs)
     assert np.array_equal(np.array(children), np.array(expected))
-

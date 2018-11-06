@@ -2,7 +2,8 @@ from boltons.queueutils import PriorityQueue
 
 
 def _get_optimal_path(predecessors, start_node, node, hash_fn):
-    # Reconstruct the optimal path from the start to the current node
+    """Reconstruct the optimal path from the start to the current node."""
+
     path = [node]
     hashed_start = hash_fn(start_node)
 
