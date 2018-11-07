@@ -35,12 +35,12 @@ The datasets include:
 
 Train the target model:
 ```
-PYTHONPATH=. python scripts/wfp.py train --help
+PYTHONPATH=. python scripts/lr_cumul_wfp.py train --help
 ```
 
 Generate provably epsilon-minimal adversarial examples:
 ```
-PYTHONPATH=. python scripts/wfp.py generate --help
+PYTHONPATH=. python scripts/lr_cumul_wfp.py generate --help
 ```
 
 ## Development

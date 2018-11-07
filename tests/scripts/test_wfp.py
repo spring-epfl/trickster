@@ -9,7 +9,7 @@ import pandas as pd
 
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../..")
-WFP_SCRIPT = os.path.join(BASE_DIR, "scripts/wfp.py")
+WFP_SCRIPT = os.path.join(BASE_DIR, "scripts/lr_cumul_wfp.py")
 DATA_PATH = os.path.join(BASE_DIR, "data/wfp_traces_toy")
 
 MAX_TRACES = 50

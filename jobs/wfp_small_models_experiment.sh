@@ -10,7 +10,7 @@ ITER_LIM=100
 echo "Training small models..."
 seq $NUM_MODELS | \
     parallel -j $NPROC \
-    scripts/wfp.py train \
+    scripts/lr_cumul_wfp.py train \
         --seed {} \
         --log_file "log/wfp_small_models_{}.log" \
         --shuffle \
@@ -22,7 +22,7 @@ seq $NUM_MODELS | \
 echo "Generating adversarial examples..."
 seq $NUM_MODELS | \
     parallel -j $NPROC \
-    scripts/wfp.py generate \
+    scripts/lr_cumul_wfp.py generate \
         --log_file "log/wfp_small_models_{}.log" \
         --model_pickle "models/small_model_{}.pkl" \
         --iter_lim $ITER_LIM \

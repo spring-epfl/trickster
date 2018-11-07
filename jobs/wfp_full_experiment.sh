@@ -10,7 +10,7 @@ jobs/train_lr_cumul.sh
 echo "Generating adversarial examples..."
 python -c "for eps in $EPSILONS: print(eps)" | \
     parallel -j $NPROC \
-    scripts/wfp.py generate \
+    scripts/lr_cumul_wfp.py generate \
         --log_file "log/wfp_full_eps_{}_tracelen_${GENERATION_MAX_TRACE_LEN}_iter_${ITER_LIM}.log" \
         --model_pickle "models/model_full_lr_cumul.pkl" \
         --epsilon {} \
