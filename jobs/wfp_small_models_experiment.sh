@@ -17,16 +17,16 @@ seq $NUM_MODELS | \
         --num_traces $TRAIN_DATASET_SIZE \
         --model lr \
         --features cumul \
-        --model_pickle "models/small_model_{}.pkl"
+        --model_pickle "out/models/small_model_{}.pkl"
 
 echo "Generating adversarial examples..."
 seq $NUM_MODELS | \
     parallel -j $NPROC \
     scripts/lr_cumul_wfp.py generate \
         --log_file "log/wfp_small_models_{}.log" \
-        --model_pickle "models/small_model_{}.pkl" \
+        --model_pickle "out/models/small_model_{}.pkl" \
         --iter_lim $ITER_LIM \
         --features cumul \
         --num_traces $GENERATION_DATASET_SIZE \
         --max_trace_len $GENERATION_MAX_TRACE_LEN \
-        --output_pickle "out/results_small_model_{}.pkl"
+        --output_pickle "out/reports/results_small_model_{}.pkl"
