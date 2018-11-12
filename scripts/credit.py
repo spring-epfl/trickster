@@ -165,7 +165,7 @@ if __name__ == "__main__":
 
             results.append(result)
 
-    output_file = "out/reports/credit.pickle"
+    output_file = "out/reports/credit.pkl"
     logger.info("Saving output to {}.".format(output_file))
 
     with open(output_file, "wb") as f:
