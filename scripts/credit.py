@@ -121,10 +121,10 @@ if __name__ == "__main__":
     log_file = "log/credit_output.log"
     logger = setup_custom_logger(log_file)
 
-    # Define dataset location.
+    # Dataset location.
     data_file = "notebooks/data/german_credit_data.csv"
 
-    # Define the meta-experiment parameters.
+    # Meta-experiment parameters.
     bin_counts = [5, 50] + list(range(100, 1001, 100))
     p_norm, q_norm = 1, np.inf
     epsilons = [0, 1, 2.5, 5, 10e+5]
@@ -165,8 +165,9 @@ if __name__ == "__main__":
 
             results.append(result)
 
-    output_file = "out/credit.pickle"
+    output_file = "out/reports/credit.pickle"
     logger.info("Saving output to {}.".format(output_file))
 
     with open(output_file, "wb") as f:
         pickle.dump(results, f)
+
