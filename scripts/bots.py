@@ -286,7 +286,7 @@ if __name__ == "__main__":
 
                 results.append(result)
 
-        output_file = "out/bots_{}.pickle".format(popularity_band)
+        output_file = "out/reports/bots_{}.pkl".format(popularity_band)
         logger.info("Saving output to {}.".format(output_file))
 
         with open(output_file, "wb") as f:
