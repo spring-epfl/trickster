@@ -1,5 +1,7 @@
 """
 Generic utils.
+
+TODO(bogdan): Rename this and possibly split across multiple modules.
 """
 
 # Ignore warnings.
