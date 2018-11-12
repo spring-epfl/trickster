@@ -122,7 +122,7 @@ if __name__ == "__main__":
     logger = setup_custom_logger(log_file)
 
     # Dataset location.
-    data_file = "notebooks/data/german_credit_data.csv"
+    data_file = "data/german_credit/german_credit_data.csv"
 
     # Meta-experiment parameters.
     bin_counts = [5, 50] + list(range(100, 1001, 100))
