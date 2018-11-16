@@ -40,6 +40,12 @@ def defend(list1, list2, method, parameter):
 
 import sys
 import os
+
+if len(sys.argv)!= 2:
+    exit("Need max trace length parameter")
+
+max_trace_len = int(sys.argv[1]) 
+
 parameters = [0, 0]
 
 packets = []
@@ -48,16 +54,16 @@ packets = []
 
 method = 3
 
-if not os.path.exists("batchusenix-tdef"):
-    os.makedirs("batchusenix-tdef")
+if not os.path.exists("../../data/batchusenix-tdef"):
+    os.makedirs("../../data/batchusenix-tdef")
 
-if not os.path.exists("batchtcp"):
+if not os.path.exists("../../data/batch"):
     print "batchtcp folder needs to exist"
     sys.exit(0)
 
 #Preprocessing
 for i in range(0, 100):
-    with open("batchtcp/" + str(i) + "-0", "r") as f:
+    with open("../../data/batch/" + str(i) + "-0", "r") as f:
         tardist.append([[], []])
         for x in f.readlines():
             x = x.split("\t")[1]
@@ -70,11 +76,13 @@ for j in range(0, 100):
     print j
     for i in range(0, 90):
         packets = []
-        with open("batchtcp/" + str(j) + "-" + str(i), "r") as f:
+        with open("../../data/batch/" + str(j) + "-" + str(i), "r") as f:
             for x in f.readlines():
                 x = x.split("\t")
                 packets.append([float(x[0]), int(x[1])])
-        with open("batchusenix-tdef/" + str(j) + "-" + str(i), "w") as f:
+        if len(packets) > max_trace_len:
+            continue
+        with open("../../data/batchusenix-tdef/" + str(j) + "-" + str(i), "w") as f:
             list2 = []
             parameters[0] = j
             parameters[1] = i

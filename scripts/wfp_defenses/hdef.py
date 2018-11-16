@@ -4,6 +4,12 @@ import sys
 import math
 import random
 
+if len(sys.argv)!= 2:
+    exit("Need max trace length parameter")
+
+max_trace_len = int(sys.argv[1]) 
+
+
 tardist = []
 
 defpackets = []
@@ -60,6 +66,8 @@ for j in range(0, 100):
             for x in f.readlines():
                 x = x.split("\t")
                 packets.append([float(x[0]), int(x[1])])
+        if len(packets) > max_trace_len:
+            continue
         with open("../../data/batchusenix-hdef/" + str(j) + "-" + str(i), "w") as f:
             list2 = []
             parameters[0] = j

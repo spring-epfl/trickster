@@ -116,6 +116,9 @@ foldout = "../../data/batch-tamaraw/"
 if not os.path.exists(foldout):
     os.makedirs(foldout)
 
+max_trace_len = int(sys.argv[1]) 
+
+
 packets = []
 desc = ""
 anoad = []
@@ -130,6 +133,8 @@ for site in range(0, sitenum):
             for x in lines:
                 x = x.split("\t")
                 packets.append([float(x[0]) - starttime, int(x[1])])
+        if len(packets) > max_trace_len:
+            continue
         list2 = []
         parameters = [""]
         

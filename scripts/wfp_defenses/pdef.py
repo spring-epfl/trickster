@@ -1,6 +1,12 @@
 import os 
 import sys
 
+if len(sys.argv)!= 2:
+    exit("Need max trace length parameter")
+
+max_trace_len = int(sys.argv[1]) 
+
+
 if not os.path.exists("../../data/batchusenix-pdef/"):
     os.makedirs("../../data/batchusenix-pdef")
 
@@ -18,6 +24,8 @@ for site in range(0, 100):
         f1 = open(fold + str(site) + "-" + str(inst), "r")
         lines1 = f1.readlines()
         f1.close()
+        if len(lines1) > max_trace_len:
+            continue
         f2 = open(fold + str(count), "r")
         lines2 = f2.readlines()
         f2.close()
