@@ -189,7 +189,7 @@ def load_data(
 
             # Trace might be None if it was longer than allowed.
             if trace is not None:
-                label = 1 if "-" in str(filename) else 0
+                label = 0 if "-" in str(filename) else 1
                 data.append(trace)
                 labels.append(label)
 
@@ -285,4 +285,3 @@ def insert_dummy_packets(trace, index, num_dummies=1):
         return None
     extended = trace[:index] + [1] * num_dummies + trace[index:]
     return extended
-
