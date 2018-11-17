@@ -6,6 +6,7 @@ TODO(bogdan): Rename this and possibly split across multiple modules.
 
 # Ignore warnings.
 import warnings
+
 warnings.filterwarnings("ignore")
 
 import logging
@@ -197,7 +198,7 @@ class AdversarialExampleParams:
     clf = attr.ib()
     expansions = attr.ib(default=attr.Factory(list))
     target_class = attr.ib(default=1)
-    target_confidence = attr.ib(default=.5)
+    target_confidence = attr.ib(default=0.5)
     p_norm = attr.ib(default=1)
     q_norm = attr.ib(default=np.inf)
     epsilon = attr.ib(default=1)
@@ -465,9 +466,9 @@ def dataset_find_adversarial_examples(
 def experiment_wrapper(
     load_transform_data_fn,
     clf_fit_fn,
-    target_class=1.,
-    target_confidence=.5,
-    confidence_margin=1.,
+    target_class=1.0,
+    target_confidence=0.5,
+    confidence_margin=1.0,
     search_funcs=None,
     search_kwargs=None,
     baseline_dataset_find_examples_fn=None,

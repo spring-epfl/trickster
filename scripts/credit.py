@@ -127,7 +127,7 @@ if __name__ == "__main__":
     # Meta-experiment parameters.
     bin_counts = [5, 50] + list(range(100, 1001, 100))
     p_norm, q_norm = 1, np.inf
-    epsilons = [0, 1, 2.5, 5, 10e+5]
+    epsilons = [0, 1, 2.5, 5, 10e5]
 
     results = []
 
@@ -170,4 +170,3 @@ if __name__ == "__main__":
 
     with open(output_file, "wb") as f:
         pickle.dump(results, f)
-

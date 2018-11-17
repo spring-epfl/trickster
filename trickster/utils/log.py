@@ -29,4 +29,3 @@ def setup_custom_logger(log_file="log/output.log", logger_name=None):
     logger.addHandler(handler)
 
     return logger
-
