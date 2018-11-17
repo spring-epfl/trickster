@@ -13,10 +13,12 @@ import numpy as np
 import pandas as pd
 import pickle
 import ast
+import click
 
 from trickster.search import a_star_search, ida_star_search
 from trickster.adversarial_helper import *
 from trickster.expansions import *
+from trickster.utils.norms import get_holder_conjugates
 from sklearn.linear_model import LogisticRegressionCV
 
 
@@ -218,76 +220,127 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
     return results
 
 
-# Main function.
-if __name__ == "__main__":
-    # Setup a custom logger.
-    log_file = "log/bots_output.log"
+@click.command()
+@click.argument(
+    "epsilons",
+    nargs=-1,
+    type=float,
+)
+@click.option(
+    "--log_file",
+    default="log/bots_output.log",
+    type=click.Path(),
+    help="Log file path.",
+)
+@click.option("--seed", default=1, type=int, help="Random seed.")
+@click.option(
+    "--popularity_band",
+    default="1k",
+    show_default=True,
+    type=click.Choice(["1k", "100k", "1M", "10M"]),
+)
+@click.option(
+    "--human_dataset_template",
+    default="data/twitter_bots/humans/humans.{}.csv",
+    show_default=True,
+)
+@click.option(
+    "--bot_dataset_template",
+    default="data/twitter_bots/bots/bots.{}.csv",
+    show_default=True,
+)
+
+@click.option(
+    "--p_norm",
+    default="1",
+    type=click.Choice(["1", "2", "inf"]),
+    help="The p parameter of the Lp norm for computing the cost.",
+)
+@click.option(
+    "--confidence_level",
+    default=0.5,
+    show_default=True,
+    help="Target confidence level.",
+)
+@click.option(
+    "--output_pickle",
+    type=click.Path(exists=False, dir_okay=False),
+    help="Output results dataframe pickle.",
+)
+def generate(
+    log_file,
+    model,
+    seed,
+    shuffle,
+    popularity_band,
+    human_dataset_template,
+    bot_dataset_template,
+    epsilons,
+    p_norm,
+    confidence_level,
+    output_pickle,
+):
     logger = setup_custom_logger(log_file)
+    p_norm, q_norm = get_holder_conjugates(p_norm)
 
-    # Perform experiments for different popularity bands.
-    popularity_bands = ["1k", "100k", "1M", "10M"]
+    # Define dataset locations.
+    human_dataset = human_dataset_template.format(popularity_band)
+    bot_dataset = bot_dataset_template.format(popularity_band)
 
-    for popularity_band in popularity_bands:
+    # Define the meta-experiment parameters.
+    bin_counts = np.arange(5, 101, 5)
 
-        # Define dataset locations.
-        human_dataset = "data/twitter_bots/humans/humans.{}.csv".format(popularity_band)
-        bot_dataset = "data/twitter_bots/bots/bots.{}.csv".format(popularity_band)
+    # Define features that will be removed.
+    drop_features = [
+        "follower_friend_ratio",
+        "tweet_frequency",
+        "favourite_tweet_ratio",
+    ]
 
-        # Define the meta-experiment parameters.
-        bin_counts = np.arange(5, 101, 5)
-        p_norm, q_norm = 1, np.inf
-        epsilons = [0, 1, 2, 3, 5, 10, 100, 500, 1000, 5000]
+    results = []
 
-        # Define features that will be removed.
-        drop_features = [
-            "follower_friend_ratio",
-            "tweet_frequency",
-            "favourite_tweet_ratio",
-        ]
+    # Perform the experiments.
+    logger.info("Starting experiments for the Twitter bot dataset.")
 
-        results = []
+    for epsilon in epsilons:
 
-        # Perform the experiments.
-        logger.info("Starting experiments for the Twitter bot dataset.")
+        logger.info(
+            "Loading and preprocessing input data for epsilon: {}...".format(epsilon)
+        )
 
-        for epsilon in epsilons:
-
+        for bins in bin_counts:
             logger.info(
-                "Loading and preprocessing input data for epsilon: {}...".format(
-                    epsilon
-                )
+                "Loading and preprocessing input data for {} bins...".format(bins)
+            )
+            result = experiment_wrapper(
+                load_transform_data_fn=load_transform_data_fn,
+                load_kwargs=dict(
+                    human_dataset=human_dataset,
+                    bot_dataset=bot_dataset,
+                    drop_features=drop_features,
+                    bins=bins,
+                ),
+                search_kwargs=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
+                clf_fit_fn=clf_fit_fn,
+                target_class=1,
+                target_confidence=confidence_level,
+                get_expansions_fn=get_expansions_fn,
+                logger=logger,
+                random_state=SEED,
             )
 
-            for bins in bin_counts:
-                logger.info(
-                    "Loading and preprocessing input data for {} bins...".format(bins)
-                )
-                result = experiment_wrapper(
-                    load_transform_data_fn=load_transform_data_fn,
-                    load_kwargs=dict(
-                        human_dataset=human_dataset,
-                        bot_dataset=bot_dataset,
-                        drop_features=drop_features,
-                        bins=bins,
-                    ),
-                    search_kwargs=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
-                    clf_fit_fn=clf_fit_fn,
-                    target_class=0,
-                    target_confidence=0.5,
-                    get_expansions_fn=get_expansions_fn,
-                    logger=logger,
-                    random_state=SEED,
-                )
+            result["bins"] = bins
+            result["epsilon"] = epsilon
+            result["p_norm"] = p_norm
+            result["q_norm"] = q_norm
 
-                result["bins"] = bins
-                result["epsilon"] = epsilon
-                result["p_norm"] = p_norm
-                result["q_norm"] = q_norm
+            results.append(result)
 
-                results.append(result)
+    logger.info("Saving output to {}.".format(output_file))
 
-        output_file = "out/reports/bots_{}.pkl".format(popularity_band)
-        logger.info("Saving output to {}.".format(output_file))
+    with open(output_file, "wb") as f:
+        pickle.dump(results, f)
 
-        with open(output_file, "wb") as f:
-            pickle.dump(results, f)
+
+if __name__ == "__main__":
+    generate()
