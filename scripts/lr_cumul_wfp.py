@@ -29,6 +29,7 @@ from trickster.domain.wfp import extract, pad_and_onehot, load_data
 from trickster.domain.wfp import insert_dummy_packets
 from trickster.utils.log import LOGGER_NAME, setup_custom_logger
 from trickster.utils.cli import add_options
+from trickster.utils.norms import get_holder_conjugates
 
 from tqdm import tqdm
 from sklearn.utils import shuffle
@@ -310,7 +311,7 @@ def run_wfp_experiment(
     features="cumul",
     target_confidence=0.5,
     p_norm="1",
-    epsilon=1.,
+    epsilon=1.0,
     shuffle=False,
     max_traces=None,
     max_trace_len=None,
@@ -353,16 +354,7 @@ def run_wfp_experiment(
         ]
     )
 
-    # Pick appropriate values of p and q norms.
-    if p_norm == "1":
-        p_norm = 1
-        q_norm = np.inf
-    elif p_norm == "2":
-        p_norm = 2
-        q_norm = 2
-    elif p_norm == "inf":
-        p_norm = np.inf
-        q_norm = 1
+    p_norm, q_norm = get_holder_conjugates(p_norm)
 
     # Set the global search parameters.
     search_params = AdversarialExampleParams(

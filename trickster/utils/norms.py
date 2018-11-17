@@ -8,11 +8,11 @@ def get_holder_conjugates(p_norm):
             of [1, 2, "inf"]
 
     >>> get_holder_conjugates("1")
-    1, np.inf
+    (1, inf)
     >>> get_holder_conjugates("2")
-    2, 2
+    (2, 2)
     >>> get_holder_conjugates("inf")
-    np.inf, 1
+    (inf, 1)
 
     """
 
