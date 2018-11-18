@@ -22,10 +22,6 @@ from trickster.utils.norms import get_holder_conjugates
 from sklearn.linear_model import LogisticRegressionCV
 
 
-SEED = 1
-np.random.seed(seed=SEED)
-
-
 def _transform_source_identity(X_k, sources_count=7):
     """
     Helper to transform the source_identity field.
@@ -224,7 +220,7 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
 @click.argument(
     "epsilons",
     nargs=-1,
-    type=float,
+    type=float
 )
 @click.option(
     "--log_file",
@@ -268,18 +264,17 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
     help="Output results dataframe pickle.",
 )
 def generate(
+    epsilons,
     log_file,
-    model,
     seed,
-    shuffle,
     popularity_band,
     human_dataset_template,
     bot_dataset_template,
-    epsilons,
     p_norm,
     confidence_level,
     output_pickle,
 ):
+    np.random.seed(seed=seed)
     logger = setup_custom_logger(log_file)
     p_norm, q_norm = get_holder_conjugates(p_norm)
 
@@ -322,7 +317,7 @@ def generate(
                 ),
                 search_kwargs=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
                 clf_fit_fn=clf_fit_fn,
-                target_class=1,
+                target_class=0,
                 target_confidence=confidence_level,
                 get_expansions_fn=get_expansions_fn,
                 logger=logger,
@@ -336,9 +331,9 @@ def generate(
 
             results.append(result)
 
-    logger.info("Saving output to {}.".format(output_file))
+    logger.info("Saving output to {}.".format(output_pickle))
 
-    with open(output_file, "wb") as f:
+    with open(output_pickle, "wb") as f:
         pickle.dump(results, f)
 
 
