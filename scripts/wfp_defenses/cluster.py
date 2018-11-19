@@ -29,7 +29,7 @@ sseq = []
 tseq = []
 
 def dist(sinste1, sinste2):
-        
+
     #Returns distance between sinste and sinste2
     #Does true supersequence finding
     lastline = [0] * len(sizes[sinste1])
@@ -50,12 +50,12 @@ def dist(sinste1, sinste2):
     return len(sizes[sinste1]) + len(sizes[sinste2]) - 2 * lastline[j]
 
 def samelendist(sinste1, sinste2):
-        
+
     #Returns distance between sinste and sinste2
     #Does true supersequence finding
 
     minsize = min(len(sizes[sinste1]), len(sizes[sinste2]))
-    
+
     lastline = [0] * minsize
     thisline = [0] * minsize
 
@@ -107,7 +107,7 @@ def superseq(clus):
         sseq.pop(0)
     while (len(tseq) > 0):
         tseq.pop(0)
-        
+
     while (done != totaldone):
         vote = 0
         #make your votes
@@ -117,7 +117,7 @@ def superseq(clus):
                     vote += 3.5
                 else:
                     vote += -1
-        
+
         #make a decision
 
         if (vote > 0):
@@ -131,7 +131,7 @@ def superseq(clus):
         #progress pointers
 
         passtimes = []
-        
+
         for i in range(0, len(clus)):
             if (pointers[i] != -1):
                 if (sizes[clus[i]][pointers[i]] * thispacket > 0):
@@ -139,12 +139,12 @@ def superseq(clus):
 
         passtimes = sorted(passtimes)
         time = max(passtimes[int(len(passtimes) * 0.8)], time)
-        
+
         for i in range(0, len(clus)):
             if (pointers[i] != -1):
                 if (sizes[clus[i]][pointers[i]] * thispacket > 0 and times[clus[i]][pointers[i]] <= time):
                     pointers[i] += 1
-                    
+
             if (pointers[i] == len(sizes[clus[i]])):
                 pointers[i] = -1
                 done += 1
@@ -161,7 +161,7 @@ def superseq(clus):
 ##    for i in range(0, len(sseq)):
 ##        fout.write(str(int(tseq[i] * 1000000)) + ",")
 ##    fout.write("\n")
-    
+
 ##    fout.close()
 
     return sseq
@@ -186,7 +186,7 @@ def transmit(smallseq, superseq):
                 superseq.append(-1)
                 superseq.append(-1)
         pt += 1
-        
+
     return pt
 
 def ucluster(method):
@@ -201,7 +201,7 @@ def ucluster(method):
     if (method == 1 or method == 2):
         for i in range(0, SITE_NUM*INST_NUM):
             clusters[i] = 0
-                
+
     #METHOD 3: Class info
     if (method == 3):
         #First level clustering
@@ -212,7 +212,7 @@ def ucluster(method):
                 for inst in range(0, INST_NUM):
                     clusters[site * INST_NUM + inst] = len(roots)
                 roots.append(site * INST_NUM)
-        
+
         rootlens = []
         for k in range(0, len(roots)):
             thisrootlens = []
@@ -220,12 +220,12 @@ def ucluster(method):
                 sinste = i * INST_NUM + random.randint(0, INST_NUM-1)
                 d = samelendist(roots[k], sinste)
                 thisrootlens.append([d, i])
-##                print d, i
+##                print(d, i)
             thisrootlens = sorted(thisrootlens, key = lambda thisrootlens:thisrootlens[0])
             rootlens.append([])
             for x in thisrootlens:
                 rootlens[-1].append(x[1])
-##            print rootlens
+##            print(rootlens)
 
         tocluster = SITE_NUM - len(roots)
         thisroot = 0
@@ -259,9 +259,9 @@ def ucluster(method):
                     sitecount.append(0)
                 else:
                     sitecount.append(-1)
-            
+
             CLUSTER_SIZE = int(math.ceil(float(SITE_NUM/SUPCLUSTER_NUM)/STOPPOINTS_NUM))
-##            print "CLUSTER_SIZE", CLUSTER_SIZE
+##            print("CLUSTER_SIZE", CLUSTER_SIZE)
             for x in clusterlens:
                 sitecount[x[1]] += 1
                 finished = 1
@@ -279,8 +279,8 @@ def ucluster(method):
                             sitecount.append(-1)
 
 ##            for i in range(0, len(stoppoints[-1])):
-##                print stoppoints[-1][i]
-        
+##                print(stoppoints[-1][i])
+
     #METHOD 4: Full info
     if (method == 4):
         inst = 0
@@ -304,7 +304,7 @@ def ucluster(method):
                             minsite = site
                 clusters[minsite * INST_NUM + inst] = c
                 tocluster -= 1
-        
+
 ##        for site in range(0, SITE_NUM):
 ##            mind = dist(site * INST_NUM + inst, roots[0])
 ##            minr = 0
@@ -314,14 +314,14 @@ def ucluster(method):
 ##                    mind = d
 ##                    minr = r
 ##            clusters[site * INST_NUM + inst] = minr
-        
+
 
 def nucluster(method):
     for i in range(0, len(clusters)):
         clusters[i] = -1
 
     roots = [] #clusternum should be 0, 1, 2....
-    
+
     #METHOD 3: Class info
     if (method == 3):
         #First level clustering
@@ -373,7 +373,7 @@ def nucluster(method):
 ##                for i in range(0, STOPPOINTS_NUM-1):
 ##                    #cost of -1 to stop point
 ##                    cost = 0
-####                    print tr, i, stopids[0], stopids[1], len(clusterlens)
+####                    print(tr, i, stopids[0], stopids[1], len(clusterlens))
 ##                    if i == 0:
 ##                        for j in range(0, len(clusterlens)):
 ##                            if clusterlens[j] < clusterlens[stopids[0]]:
@@ -387,7 +387,7 @@ def nucluster(method):
 ##                    if (cost < 0):
 ##                        stopids[i] -= 1
 ##                        change = 1
-##                        #print tr, i, stopids[i]
+##                        #print(tr, i, stopids[i])
 ##                    #cost of +1 to stop point
 ##                for i in range(0, STOPPOINTS_NUM-1):
 ##                    cost = 0
@@ -403,13 +403,13 @@ def nucluster(method):
 ##                    if (cost < 0):
 ##                        stopids[i] += 1
 ##                        change = 1
-##                        #print tr, i, stopids[i]
-                        
+##                        #print(tr, i, stopids[i])
+
             stoppoints.append([])
             for i in range(0, STOPPOINTS_NUM):
                 stoppoints[-1].append(clusterlens[stopids[i]])
 
-                
+
     if (method == 4):
         inst = 0
         sizelist = []
@@ -432,14 +432,14 @@ def nucluster(method):
                         mind = d
                         minc = c
                 clusters[sinste] = minc
-                    
 
-    
+
+
     return 0
 
 def evaluate(method):
 
-    
+
     #Returns uacc, nuacc, e
     cost = 0
     totallen = 0
@@ -452,7 +452,7 @@ def evaluate(method):
                     if (clusters[site*INST_NUM+inst] == c):
                         clus.append(site*INST_NUM+inst)
             s = superseq(clus)
-            
+
         for site in range(0, SITE_NUM):
             for inst in range(0, INST_NUM):
                 sinste = site*INST_NUM + inst
@@ -479,12 +479,12 @@ def evaluate(method):
             tlen = transmit(sizes[sinste], s)
             tlens.append([tlen, sinste / INST_NUM])
         tlens = sorted(tlens, key = lambda tlens: -tlens[0])
-##        print tlens
+##        print(tlens)
 
         sitecount = []
         for i in range(0, SITE_NUM):
             sitecount.append(0)
-            
+
         while (len(superseqlens) > 0):
             superseqlens.pop(0)
         CLUSTER_SIZE = int(math.ceil(float(SITE_NUM)/CLUSTER_NUM))
@@ -501,21 +501,21 @@ def evaluate(method):
                 for i in range(0, SITE_NUM):
                     sitecount[i] = 0
 ##        for x in superseqlens:
-##            print x
-            
+##            print(x)
+
 ##        fout = open("st.txt", "a+")
 ##        for i in range(0, len(s)):
 ##            if i in superseqlens:
-####                print i
+####                print(i)
 ##                fout.write("1,")
 ##            else:
 ##                fout.write("0,")
 ##        fout.write("\n")
 
         costs = []
-                    
+
         sdiff = tlens[0][0] / 5
-        
+
         for site in range(0, TESTSITE_NUM):
             for inst in range(0, TESTINST_NUM):
                 sinste = site*TESTINST_NUM + inst
@@ -525,7 +525,7 @@ def evaluate(method):
                 for l in superseqlens:
                     if l >= tlen and l < ptlen:
                         ptlen = l
-                #print ptlen, tlen
+                #print(ptlen, tlen)
                 cost += ptlen - len(testsizes[sinste])
                 totallen += len(testsizes[sinste])
                 costs.append((ptlen - len(testsizes[sinste])) / float(len(testsizes[sinste])))
@@ -539,7 +539,7 @@ def evaluate(method):
 ##                for l in superseqlens:
 ##                    if l >= tlen and l < ptlen:
 ##                        ptlen = l
-##                #print ptlen, tlen
+##                #print(ptlen, tlen)
 ##                fout = open("../batchusenix/" + str(site) + "-" + str(inst) + "d", "w")
 ##                for i in range(0, min(ptlen, len(sseq))):
 ##                    fout.write(str(tseq[i]) + "\t" + str(sseq[i]) + "\n")
@@ -548,7 +548,7 @@ def evaluate(method):
 ##                totallen += len(sizes[sinste])
 ##                costs.append((ptlen - len(sizes[sinste])) / float(len(sizes[sinste])))
 
-        
+
     if (method == 3):
         costs = []
         for c in range(0, SUPCLUSTER_NUM):
@@ -557,7 +557,7 @@ def evaluate(method):
                 if (clusters[sinste] == c):
                     clus.append(sinste)
             s = superseq(clus)
-            
+
             sdiff = len(s) / 5
             for inst in range(0, INST_NUM):
                 for site in range(0, SITE_NUM):
@@ -568,15 +568,15 @@ def evaluate(method):
                         for l in stoppoints[c]:
                             if l >= tlen and l < ptlen:
                                 ptlen = l
-                        #print ptlen, tlen
+                        #print(ptlen, tlen)
                         cost += ptlen - len(sizes[sinste])
                         totallen += len(sizes[sinste])
                 costs.append(float(cost)/totallen)
                 cost = 0
                 totallen = 0
         import numpy
-        print numpy.mean(costs), numpy.std(costs)
-                
+        print(numpy.mean(costs), numpy.std(costs))
+
 
     if (method == 4):
         for c in range(0, CLUSTER_NUM):
@@ -590,75 +590,76 @@ def evaluate(method):
                 totallen += len(sizes[sinste])
 
 ##    costs = sorted(costs)
-##    print costs[len(costs)/4]
-##    print costs[len(costs)/2]
-##    print costs[3*len(costs)/4]
+##    print(costs[len(costs)/4])
+##    print(costs[len(costs)/2])
+##    print(costs[3*len(costs)/4])
     return cost/float(totallen)
 
 
-print "Loading site"
-for site in range(0, SITE_NUM):
-    for instance in range(0, INST_NUM):
-        fname = str(site) + "-" + str(instance)
-        #Set up times, sizes
-        f = open("../batchusenix/" + fname, "r")
-        sizes.append([])
-        times.append([])
-        for x in f:
-            x = x.split("\t")
-            sizes[-1].append(int(x[1]))
-            times[-1].append(float(x[0]))
-        starttime = times[-1][0]
-        for i in range(0, len(times[-1])):
-            times[-1][i] -= starttime
-        f.close()
+if __name__ == '__main__':
+    print("Loading site")
+    for site in range(0, SITE_NUM):
+        for instance in range(0, INST_NUM):
+            fname = str(site) + "-" + str(instance)
+            #Set up times, sizes
+            f = open("../batchusenix/" + fname, "r")
+            sizes.append([])
+            times.append([])
+            for x in f:
+                x = x.split("\t")
+                sizes[-1].append(int(x[1]))
+                times[-1].append(float(x[0]))
+            starttime = times[-1][0]
+            for i in range(0, len(times[-1])):
+                times[-1][i] -= starttime
+            f.close()
 
-print "Loading test"
-for site in range(0, TESTSITE_NUM):   
-    for instance in range(0, TESTINST_NUM):
-        fname = str(site+SITE_NUM) + "-" + str(instance)
-        #Set up times, sizes
-        f = open("../batchusenix/" + fname, "r")
-        testsizes.append([])
-        for x in f:
-            x = x.split("\t")
-            testsizes[-1].append(int(x[1]))
-        f.close()
+    print("Loading test")
+    for site in range(0, TESTSITE_NUM):
+        for instance in range(0, TESTINST_NUM):
+            fname = str(site+SITE_NUM) + "-" + str(instance)
+            #Set up times, sizes
+            f = open("../batchusenix/" + fname, "r")
+            testsizes.append([])
+            for x in f:
+                x = x.split("\t")
+                testsizes[-1].append(int(x[1]))
+            f.close()
 
-##CLUSTER_NUM = 20
-##for i in range(1, 11):
-##    SUPCLUSTER_NUM = i
-##    STOPPOINTS_NUM = int(math.ceil(float(CLUSTER_NUM)/SUPCLUSTER_NUM))
-##    ucluster(3)
-##    print SUPCLUSTER_NUM, STOPPOINTS_NUM, evaluate(3)
+    ##CLUSTER_NUM = 20
+    ##for i in range(1, 11):
+    ##    SUPCLUSTER_NUM = i
+    ##    STOPPOINTS_NUM = int(math.ceil(float(CLUSTER_NUM)/SUPCLUSTER_NUM))
+    ##    ucluster(3)
+    ##    print(SUPCLUSTER_NUM, STOPPOINTS_NUM, evaluate(3))
 
-##for i in range(1, 21):        
-##    CLUSTER_NUM = i
-##    method = 2
-##    ucluster(method)
-##    print i, method, str(evaluate(method))
+    ##for i in range(1, 21):
+    ##    CLUSTER_NUM = i
+    ##    method = 2
+    ##    ucluster(method)
+    ##    print(i, method, str(evaluate(method)))
 
-for tr in range(0, 20):
-    for i in range(5, 6):
-        CLUSTER_NUM = 20
-        SUPCLUSTER_NUM = 2
-        STOPPOINTS_NUM = i
-        method = 3
-        ucluster(method)
-        print tr, i, method, str(evaluate(method))
+    for tr in range(0, 20):
+        for i in range(5, 6):
+            CLUSTER_NUM = 20
+            SUPCLUSTER_NUM = 2
+            STOPPOINTS_NUM = i
+            method = 3
+            ucluster(method)
+            print(tr, i, method, str(evaluate(method)))
 
-##SUPCLUSTERLIST = [1, 2, 3, 4, 5, 7, 10]
-##STOPPOINTSLIST = [20, 10, 8, 5, 4, 3, 2]
-##for i in range(6, 7):
-##    CLUSTER_NUM = 20
-##    method = 3
-##    SUPCLUSTER_NUM = SUPCLUSTERLIST[i]
-##    STOPPOINTS_NUM = STOPPOINTSLIST[i]
-##    ucluster(method)
-##    print SUPCLUSTER_NUM, STOPPOINTS_NUM, method, str(evaluate(method))
+    ##SUPCLUSTERLIST = [1, 2, 3, 4, 5, 7, 10]
+    ##STOPPOINTSLIST = [20, 10, 8, 5, 4, 3, 2]
+    ##for i in range(6, 7):
+    ##    CLUSTER_NUM = 20
+    ##    method = 3
+    ##    SUPCLUSTER_NUM = SUPCLUSTERLIST[i]
+    ##    STOPPOINTS_NUM = STOPPOINTSLIST[i]
+    ##    ucluster(method)
+    ##    print(SUPCLUSTER_NUM, STOPPOINTS_NUM, method, str(evaluate(method)))
 
-##for i in range(1, 21):
-##    CLUSTER_NUM = i
-##    method = 4
-##    nucluster(method)
-##    print i, method, str(evaluate(method))
+    ##for i in range(1, 21):
+    ##    CLUSTER_NUM = i
+    ##    method = 4
+    ##    nucluster(method)
+    ##    print(i, method, str(evaluate(method)))
