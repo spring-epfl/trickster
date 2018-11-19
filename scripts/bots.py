@@ -6,7 +6,6 @@ sys.path.append("..")
 
 # Ignore warnings.
 import warnings
-
 warnings.filterwarnings("ignore")
 
 import numpy as np
@@ -124,7 +123,8 @@ def clf_fit_fn(X_train, y_train, **kwargs):
         penalty="l2",
         scoring=scoring,
         class_weight=class_weight,
-        random_state=SEED,
+        # FIXME: Use the supplied seed.
+        random_state=1,
     )
 
     clf.fit(X_train, y_train)
@@ -234,6 +234,7 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
     default="1k",
     show_default=True,
     type=click.Choice(["1k", "100k", "1M", "10M"]),
+    help="Popularity band (dataset parameter)"
 )
 @click.option(
     "--human_dataset_template",
@@ -278,14 +279,14 @@ def generate(
     logger = setup_custom_logger(log_file)
     p_norm, q_norm = get_holder_conjugates(p_norm)
 
-    # Define dataset locations.
+    # Dataset locations.
     human_dataset = human_dataset_template.format(popularity_band)
     bot_dataset = bot_dataset_template.format(popularity_band)
 
-    # Define the meta-experiment parameters.
+    # The meta-experiment parameters.
     bin_counts = np.arange(5, 101, 5)
 
-    # Define features that will be removed.
+    # Features that will be removed.
     drop_features = [
         "follower_friend_ratio",
         "tweet_frequency",
@@ -294,9 +295,9 @@ def generate(
 
     results = []
 
-    # Perform the experiments.
     logger.info("Starting experiments for the Twitter bot dataset.")
 
+    # Perform the experiments.
     for epsilon in epsilons:
 
         logger.info(
@@ -321,9 +322,10 @@ def generate(
                 target_confidence=confidence_level,
                 get_expansions_fn=get_expansions_fn,
                 logger=logger,
-                random_state=SEED,
+                random_state=seed,
             )
 
+            # Record extra data.
             result["bins"] = bins
             result["epsilon"] = epsilon
             result["p_norm"] = p_norm
