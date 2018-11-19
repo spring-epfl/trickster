@@ -96,16 +96,17 @@ def test_generation(file_factory, trained_model_pickle):
             data_path=DATA_PATH,
             output_pickle=results_file.name,
             # Let's make the task easy.
-            epsilon=10,
+            epsilon=100,
             num_adv_examples=1,
-            confidence_level=0.1,
-            iter_lim=10,
+            confidence_level=0.5,
+            iter_lim=5,
         )
 
         assert "found" in log
         results = pd.read_pickle(results_file.name)
 
     # One example is expected to be found.
+    import ipdb; ipdb.set_trace()
     assert results.found.mean() == 1.0
     assert len(results) == 1
 
