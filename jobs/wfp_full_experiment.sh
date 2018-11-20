@@ -5,7 +5,7 @@ EPSILONS="[3, 5, 7, 10, 15, 20, 25]"
 ITER_LIM=5000
 GENERATION_MAX_TRACE_LEN=500
 
-jobs/train_lr_cumul.sh
+MODEL_TYPE=lr jobs/train_cumul.sh
 
 echo "Generating adversarial examples..."
 python -c "for eps in $EPSILONS: print(eps)" | \
