@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MODEL_TYPE=${MODEL_TYPE:="lr"}
-MODEL_NAME="model_full_$MODEL_TYPE_cumul"
+MODEL_NAME="model_full_${MODEL_TYPE}_cumul"
 
 echo "Training a model..."
 scripts/lr_cumul_wfp.py train \
