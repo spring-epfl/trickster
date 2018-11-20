@@ -15,14 +15,6 @@ DATA_PATH = os.path.join(BASE_DIR, "data/wfp_traces_toy")
 MAX_TRACES = 50
 
 
-@pytest.fixture(scope="function")
-def file_factory():
-    def make(mode="w+b"):
-        return tempfile.NamedTemporaryFile(mode)
-
-    return make
-
-
 def build_cmd(*args, **kwargs):
     """
     >>> build_cmd('script.py', 'train', model_pickle='tmp.pkl', shuffle=True)
@@ -88,7 +80,7 @@ def trained_model_pickle(file_factory):
         yield pickle_file
 
 
-def test_generation(file_factory, trained_model_pickle):
+def test_generation_success(file_factory, trained_model_pickle):
     with file_factory() as results_file:
         log = invoke_wfp_script(
             "generate",
@@ -98,16 +90,16 @@ def test_generation(file_factory, trained_model_pickle):
             # Let's make the task easy.
             epsilon=100,
             num_adv_examples=1,
-            confidence_level=0.5,
-            iter_lim=5,
+            confidence_level=0.1,
+            iter_lim=10,
         )
 
         assert "found" in log
         results = pd.read_pickle(results_file.name)
 
     # One example is expected to be found.
-    import ipdb; ipdb.set_trace()
-    assert results.found.mean() == 1.0
+    assert results.found.mean() >= 1.0
+    # Should be one, because num_adv_examples == 1.
     assert len(results) == 1
 
 
@@ -125,7 +117,7 @@ def test_generation_sort_by_len(file_factory, trained_model_pickle):
 
         results = pd.read_pickle(results_file.name)
 
-    # One example is expected to be found.
+    # Examples should be sorted by length.
     prev_len = None
     for _, row in results.iterrows():
         assert prev_len is None or len(row.x) >= prev_len
