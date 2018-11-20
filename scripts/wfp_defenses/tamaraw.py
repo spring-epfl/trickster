@@ -1,18 +1,17 @@
 #Anoa consists of two components:
 #1. Send packets at some packet rate until data is done.
 #2. Pad to cover total transmission size.
-#The main logic decides how to send the next packet.
+#The main logic decides how to send the next packet. 
 #Resultant anonymity is measured in ambiguity sizes.
 #Resultant overhead is in size and time.
-#Maximizing anonymity while minimizing overhead is what we want.
-import sys
-import os
+#Maximizing anonymity while minimizing overhead is what we want. 
 import math
 import random
 
 DATASIZE = 800
 
-
+tardist = [[], []]
+defpackets = []
 
 def fsign(num):
     if num > 0:
@@ -34,7 +33,7 @@ def AnoaTime(parameters):
             return 0.04
         if direction == 1:
             return 0.012
-
+        
 
 def AnoaPad(list1, list2, padL, method):
     lengths = [0, 0]
@@ -61,7 +60,7 @@ def AnoaPad(list1, list2, padL, method):
             lengths[j] += 1
 
 def Anoa(list1, list2, parameters): #inputpacket, outputpacket, parameters
-    #Does NOT do padding, because ambiguity set analysis.
+    #Does NOT do padding, because ambiguity set analysis. 
     #list1 WILL be modified! if necessary rewrite to tempify list1.
     starttime = list1[0][0]
     times = [starttime, starttime] #lastpostime, lastnegtime
@@ -84,7 +83,7 @@ def Anoa(list1, list2, parameters): #inputpacket, outputpacket, parameters
             cursign = 1
         times[cursign] += AnoaTime([cursign, method, times[cursign]-starttime])
         curtime = times[cursign]
-
+        
         tosend = datasize
         while (list1[listind][0] <= curtime and fsign(list1[listind][1]) == cursign and tosend > 0):
             if (tosend >= abs(list1[listind][1])):
@@ -100,58 +99,55 @@ def Anoa(list1, list2, parameters): #inputpacket, outputpacket, parameters
         else:
             list2.append([curtime, -datasize])
         lengths[cursign] += 1
-
+        
 ##    parameters = [100] #padL
 ##    AnoaPad(list2, lengths, times, parameters)
 
+import sys
+import os
+for x in sys.argv[2:]:
+    parameters.append(float(x))
 
-if __name__ == '__main__':
-    tardist = [[], []]
-    defpackets = []
+sitenum = 100
+instnum = 90
+fold = "../../data/batch/"
+foldout = "../../data/batch-tamaraw/"
 
-    for x in sys.argv[2:]:
-        parameters.append(float(x))
+if not os.path.exists(foldout):
+    os.makedirs(foldout)
 
-    sitenum = 100
-    instnum = 90
-    fold = "../../data/batch/"
-    foldout = "../../data/batch-tamaraw/"
-
-    if not os.path.exists(foldout):
-        os.makedirs(foldout)
-
-    max_trace_len = int(sys.argv[1])
+max_trace_len = int(sys.argv[1]) 
 
 
-    packets = []
-    desc = ""
-    anoad = []
-    anoadpad = []
-    for site in range(0, sitenum):
-        print(site)
-        for inst in range(0, instnum):
-            packets = []
-            with open("../../data/batch/" + str(site) + "-" + str(inst), "r") as f:
-                lines = f.readlines()
-                starttime = float(lines[0].split("\t")[0])
-                for x in lines:
-                    x = x.split("\t")
-                    packets.append([float(x[0]) - starttime, int(x[1])])
-            if len(packets) > max_trace_len:
-                continue
-            list2 = []
-            parameters = [""]
+packets = []
+desc = ""
+anoad = []
+anoadpad = []
+for site in range(0, sitenum):
+    print site
+    for inst in range(0, instnum):
+        packets = []
+        with open("../../data/batch/" + str(site) + "-" + str(inst), "r") as f:
+            lines = f.readlines()
+            starttime = float(lines[0].split("\t")[0])
+            for x in lines:
+                x = x.split("\t")
+                packets.append([float(x[0]) - starttime, int(x[1])])
+        if len(packets) > max_trace_len:
+            continue
+        list2 = []
+        parameters = [""]
+        
+        Anoa(packets, list2, parameters)
+        list2 = sorted(list2, key = lambda list2: list2[0])
+        anoad.append(list2)
 
-            Anoa(packets, list2, parameters)
-            list2 = sorted(list2, key = lambda list2: list2[0])
-            anoad.append(list2)
+        list3 = []
+        
+        AnoaPad(list2, list3, 100, 0)
 
-            list3 = []
-
-            AnoaPad(list2, list3, 100, 0)
-
-            fout = open(foldout + str(site) + "-" + str(inst), "w")
-            for x in list3:
-                fout.write(str(x[0]) + "\t" + str(x[1]) + "\n")
-            fout.close()
+        fout = open(foldout + str(site) + "-" + str(inst), "w")
+        for x in list3:
+            fout.write(str(x[0]) + "\t" + str(x[1]) + "\n")
+        fout.close()
 

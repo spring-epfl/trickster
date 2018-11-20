@@ -1,8 +1,10 @@
 #Generates 1-X from 0-X.
-import sys
-import os
 import math
 import random
+
+tardist = []
+
+defpackets = []
 
 def fsign(num):
     if num > 0:
@@ -36,59 +38,56 @@ def defend(list1, list2, method, parameter):
                 list2.append([x[0], abs(x[1])/x[1] * s[0]])
                 remainder -= s[0]
 
+import sys
+import os
 
-if __name__ == '__main__':
-    if len(sys.argv)!= 2:
-        exit("Need max trace length parameter")
+if len(sys.argv)!= 2:
+    exit("Need max trace length parameter")
 
-    max_trace_len = int(sys.argv[1])
+max_trace_len = int(sys.argv[1]) 
 
-    tardist = []
+parameters = [0, 0]
 
-    defpackets = []
+packets = []
 
-    parameters = [0, 0]
+#method = int(sys.argv[1])
 
-    packets = []
+method = 3
 
-    #method = int(sys.argv[1])
+if not os.path.exists("../../data/batchusenix-tdef"):
+    os.makedirs("../../data/batchusenix-tdef")
 
-    method = 3
+if not os.path.exists("../../data/batch"):
+    print "batchtcp folder needs to exist"
+    sys.exit(0)
 
-    if not os.path.exists("../../data/batchusenix-tdef"):
-        os.makedirs("../../data/batchusenix-tdef")
+#Preprocessing
+for i in range(0, 100):
+    with open("../../data/batch/" + str(i) + "-0", "r") as f:
+        tardist.append([[], []])
+        for x in f.readlines():
+            x = x.split("\t")[1]
+            if (int(x) > 0):
+                tardist[-1][0].append(abs(int(x)))
+            elif (int(x) < 0):
+                tardist[-1][1].append(abs(int(x)))
 
-    if not os.path.exists("../../data/batch"):
-        print("batchtcp folder needs to exist")
-        sys.exit(0)
-
-    #Preprocessing
-    for i in range(0, 100):
-        with open("../../data/batch/" + str(i) + "-0", "r") as f:
-            tardist.append([[], []])
+for j in range(0, 100):
+    print j
+    for i in range(0, 90):
+        packets = []
+        with open("../../data/batch/" + str(j) + "-" + str(i), "r") as f:
             for x in f.readlines():
-                x = x.split("\t")[1]
-                if (int(x) > 0):
-                    tardist[-1][0].append(abs(int(x)))
-                elif (int(x) < 0):
-                    tardist[-1][1].append(abs(int(x)))
-
-    for j in range(0, 100):
-        print(j)
-        for i in range(0, 90):
-            packets = []
-            with open("../../data/batch/" + str(j) + "-" + str(i), "r") as f:
-                for x in f.readlines():
-                    x = x.split("\t")
-                    packets.append([float(x[0]), int(x[1])])
-            if len(packets) > max_trace_len:
-                continue
-            with open("../../data/batchusenix-tdef/" + str(j) + "-" + str(i), "w") as f:
-                list2 = []
-                parameters[0] = j
-                parameters[1] = i
-                defend(packets, list2, method, parameters)
-                list2 = sorted(list2, key = lambda list2: list2[0])
-                for x in list2:
-                    f.write(repr(x[0]) + "\t" + repr(x[1]) + "\n")
-
+                x = x.split("\t")
+                packets.append([float(x[0]), int(x[1])])
+        if len(packets) > max_trace_len:
+            continue
+        with open("../../data/batchusenix-tdef/" + str(j) + "-" + str(i), "w") as f:
+            list2 = []
+            parameters[0] = j
+            parameters[1] = i
+            defend(packets, list2, method, parameters)
+            list2 = sorted(list2, key = lambda list2: list2[0])
+            for x in list2:
+                f.write(repr(x[0]) + "\t" + repr(x[1]) + "\n")
+            
