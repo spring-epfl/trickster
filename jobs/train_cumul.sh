@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MODEL_TYPE=${MODEL_TYPE="lr"}
+MODEL_TYPE=${MODEL_TYPE:="lr"}
 MODEL_NAME="model_full_$MODEL_TYPE_cumul"
 
 echo "Training a model..."
