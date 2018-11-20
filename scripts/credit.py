@@ -108,10 +108,10 @@ def get_expansions_fn(features, expand_quantized_fn, **kwargs):
     return expansions, transformable_feature_idxs
 
 
-def baseline_dataset_find_examples_fn(search_funcs=None, **kwargs):
+def baseline_dataset_find_examples_fn(graph_search_funcs=None, **kwargs):
     """Perform BFS adversarial example search to baseline against A* search."""
-    search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
-    results = dataset_find_adversarial_examples(search_funcs=search_funcs, **kwargs)
+    graph_search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
+    results = dataset_find_adversarial_examples(graph_search_funcs=graph_search_funcs, **kwargs)
     return results
 
 
@@ -148,7 +148,7 @@ if __name__ == "__main__":
             result = experiment_wrapper(
                 load_transform_data_fn=load_transform_data_fn,
                 load_kwargs=dict(data_file=data_file, bins=bins),
-                search_kwargs=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
+                problem_params=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
                 clf_fit_fn=clf_fit_fn,
                 target_class=1,
                 get_expansions_fn=get_expansions_fn,
@@ -165,7 +165,7 @@ if __name__ == "__main__":
 
             results.append(result)
 
-    output_file = "out/reports/credit.pkl"
+    output_file = "out/reports/manual_credit.pkl"
     logger.info("Saving output to {}.".format(output_file))
 
     with open(output_file, "wb") as f:

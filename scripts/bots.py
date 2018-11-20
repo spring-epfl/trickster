@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 
 import sys
-
 sys.path.append("..")
 
 # Ignore warnings.
 import warnings
+
 warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
 import pickle
 import ast
+import pprint
 import click
 
 from trickster.search import a_star_search, ida_star_search
@@ -131,10 +132,29 @@ def clf_fit_fn(X_train, y_train, **kwargs):
     return clf
 
 
-def get_expansions_fn(features, **kwargs):
+def get_expansions_fn(features, expanded_features=None, **kwargs):
     """
     Define expansions to perform on features and obtain feature indexes.
+
+    :param features: Feature names.
     """
+
+    if expanded_features is None:
+        # Default features.
+        expanded_features = [
+            "source_identity",
+            "user_tweeted",
+            "user_retweeted",
+            "user_favourited",
+            "user_replied",
+            "likes_per_tweet",
+            "retweets_per_tweet",
+            "lists_per_user",
+            "age_of_account_in_days",
+            "source_count",
+            "urls_count",
+            "cdn_content_in_kb",
+        ]
 
     # Find indexes of required features in the original feature space.
     idxs_source_identity = find_substring_occurences(features, "source_identity")
@@ -143,9 +163,13 @@ def get_expansions_fn(features, **kwargs):
     idxs_favourited = find_substring_occurences(features, "user_favourited")
     idxs_replied = find_substring_occurences(features, "user_replied")
     idxs_likes_per_tweet = find_substring_occurences(features, "likes_per_tweet")
-    idxs_retweets_per_tweet = find_substring_occurences(features, "retweets_per_tweet")
+    idxs_retweets_per_tweet = find_substring_occurences(
+        features, "retweets_per_tweet"
+    )
     idxs_lists = find_substring_occurences(features, "lists_per_user")
-    idxs_age_of_account = find_substring_occurences(features, "age_of_account_in_days")
+    idxs_age_of_account = find_substring_occurences(
+        features, "age_of_account_in_days"
+    )
     idxs_sources_count = find_substring_occurences(features, "sources_count")
     idxs_urls = find_substring_occurences(features, "urls_count")
     idxs_cdn_content = find_substring_occurences(features, "cdn_content_in_kb")
@@ -217,11 +241,7 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
 
 
 @click.command()
-@click.argument(
-    "epsilons",
-    nargs=-1,
-    type=float
-)
+@click.argument("epsilons", nargs=-1, type=float)
 @click.option(
     "--log_file",
     default="log/bots_output.log",
@@ -234,7 +254,14 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
     default="1k",
     show_default=True,
     type=click.Choice(["1k", "100k", "1M", "10M"]),
-    help="Popularity band (dataset parameter)"
+    help="Popularity band (dataset parameter)",
+)
+@click.option(
+    "--bins",
+    default=None,
+    show_default=True,
+    type=int,
+    help="Number of discretization bins.",
 )
 @click.option(
     "--human_dataset_template",
@@ -246,7 +273,11 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
     default="data/twitter_bots/bots/bots.{}.csv",
     show_default=True,
 )
-
+@click.option(
+    "--reduce_classifier/--no_reduce_classifier",
+    default=True,
+    help="Whether to use classifier reduction optimization.",
+)
 @click.option(
     "--p_norm",
     default="1",
@@ -264,27 +295,43 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
     type=click.Path(exists=False, dir_okay=False),
     help="Output results dataframe pickle.",
 )
+@click.option(
+    "--iter_lim",
+    default=None,
+    show_default=True,
+    help="Max number of search iterations until before giving up.",
+)
+@click.pass_context
 def generate(
+    ctx,
     epsilons,
     log_file,
     seed,
     popularity_band,
+    bins,
     human_dataset_template,
     bot_dataset_template,
+    reduce_classifier,
     p_norm,
     confidence_level,
     output_pickle,
+    iter_lim
 ):
     np.random.seed(seed=seed)
     logger = setup_custom_logger(log_file)
+    logger.info("Params: %s" % pprint.pformat(ctx.params))
+
     p_norm, q_norm = get_holder_conjugates(p_norm)
 
     # Dataset locations.
     human_dataset = human_dataset_template.format(popularity_band)
     bot_dataset = bot_dataset_template.format(popularity_band)
 
-    # The meta-experiment parameters.
-    bin_counts = np.arange(5, 101, 5)
+    # Data discretization parameter.
+    if bins is None:
+        bin_counts = np.arange(5, 101, 5)
+    else:
+        bin_counts = [bins]
 
     # Features that will be removed.
     drop_features = [
@@ -316,11 +363,19 @@ def generate(
                     drop_features=drop_features,
                     bins=bins,
                 ),
-                search_kwargs=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
+                problem_params=dict(
+                    p_norm=p_norm,
+                    q_norm=q_norm,
+                    epsilon=epsilon,
+                ),
+                graph_search_kwargs=dict(
+                    iter_lim=iter_lim
+                ),
                 clf_fit_fn=clf_fit_fn,
                 target_class=0,
                 target_confidence=confidence_level,
                 get_expansions_fn=get_expansions_fn,
+                reduce_classifier=reduce_classifier,
                 logger=logger,
                 random_state=seed,
             )

@@ -78,7 +78,7 @@ def find_substring_occurences(xs, item):
 
 
 def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
-    """Construct a reduced-dimension classifier based on the original one for a given example.
+    r"""Construct a reduced-dimension classifier based on the original one for a given example.
 
     The reduced-dimension classifier should behave the same way as the original one, but operate in
     a smaller feature space. This is done by fixing the score of the classifier on a static part of
@@ -192,7 +192,7 @@ class Node(object):
 
 @with_default_context
 @attr.s
-class AdversarialExampleParams:
+class AdvProblemContext:
     """Parameters for a single adversarial example search instance."""
 
     clf = attr.ib()
@@ -209,9 +209,9 @@ def default_expand_fn(x):
     """Expand x and compute the costs.
     Returns a list of tuples (child, cost)
     """
-    search_params = AdversarialExampleParams.get_default()
-    children = x.expand(search_params.expansions)
-    costs = [np.linalg.norm(x.src - c.src, ord=search_params.p_norm) for c in children]
+    problem_ctx = AdvProblemContext.get_default()
+    children = x.expand(problem_ctx.expansions)
+    costs = [np.linalg.norm(x.src - c.src, ord=problem_ctx.p_norm) for c in children]
 
     return list(zip(children, costs))
 
@@ -219,10 +219,10 @@ def default_expand_fn(x):
 @profiled
 def default_goal_fn(x):
     """Tell whether the example has reached the goal."""
-    search_params = AdversarialExampleParams.get_default()
+    problem_ctx = AdvProblemContext.get_default()
     return (
-        search_params.clf.predict_proba([x.src])[0, search_params.target_class]
-        >= search_params.target_confidence
+        problem_ctx.clf.predict_proba([x.src])[0, problem_ctx.target_class]
+        >= problem_ctx.target_confidence
     )
 
 
@@ -235,15 +235,15 @@ def default_heuristic_fn(x):
     NOTE: The value has to be zero if the example is already on the target side
     of the boundary.
     """
-    search_params = AdversarialExampleParams.get_default()
-    confidence = search_params.clf.predict_proba([x.src])[0, search_params.target_class]
-    if confidence >= search_params.target_confidence:
+    problem_ctx = AdvProblemContext.get_default()
+    confidence = problem_ctx.clf.predict_proba([x.src])[0, problem_ctx.target_class]
+    if confidence >= problem_ctx.target_confidence:
         return 0.0
-    score = search_params.clf.decision_function([x.src])[0]
+    score = problem_ctx.clf.decision_function([x.src])[0]
     h = np.abs(score) / np.linalg.norm(
-        search_params.clf.coef_[0], ord=search_params.q_norm
+        problem_ctx.clf.coef_[0], ord=problem_ctx.q_norm
     )
-    return h * search_params.epsilon
+    return h * problem_ctx.epsilon
 
 
 @profiled
@@ -261,12 +261,12 @@ def default_example_wrapper_fn(x):
 @profiled
 def default_real_cost_fn(x, another):
     """Real cost for transforming example into another one."""
-    search_params = AdversarialExampleParams.get_default()
-    return np.linalg.norm(x.src - another.src, ord=search_params.p_norm)
+    problem_ctx = AdvProblemContext.get_default()
+    return np.linalg.norm(x.src - another.src, ord=problem_ctx.p_norm)
 
 
 @attr.s
-class SearchFuncs:
+class GraphSearchFuncs:
     """
     Functions that define the graph search instance.
 
@@ -275,7 +275,9 @@ class SearchFuncs:
             in a :py:class:`Node` class.
     :param expand_fn: Returns the expanded neighbour nodes for a given node.
     :param goal_fn: Predicate that tells whether a given node is a target node.
-    :param heuristic_fn: Returns an estimate of how far the given example
+    :param heuristic_fn: Returns an estimate of how far the given example.
+    :param hash_fn: Hash function for nodes.
+    :param real_cost_fn: An extra cost function between an example and adv. example used for analysis and reporting.
     """
 
     example_wrapper_fn = attr.ib(
@@ -290,18 +292,18 @@ class SearchFuncs:
 
 @profiled
 def find_adversarial_example(
-    example, search_fn, search_funcs, return_path=False, **kwargs
+    example, search_fn, graph_search_funcs, graph_search_kwargs, return_path=False
 ):
     """Transform an example until it is classified as target."""
-    wrapped_example = search_funcs.example_wrapper_fn(example)
+    wrapped_example = graph_search_funcs.example_wrapper_fn(example)
     return search_fn(
         start_node=wrapped_example,
-        expand_fn=search_funcs.expand_fn,
-        goal_fn=search_funcs.goal_fn,
-        heuristic_fn=search_funcs.heuristic_fn,
-        hash_fn=search_funcs.hash_fn,
+        expand_fn=graph_search_funcs.expand_fn,
+        goal_fn=graph_search_funcs.goal_fn,
+        heuristic_fn=graph_search_funcs.heuristic_fn,
+        hash_fn=graph_search_funcs.hash_fn,
         return_path=return_path,
-        **kwargs
+        **graph_search_kwargs
     )
 
 
@@ -310,21 +312,22 @@ def dataset_find_adversarial_examples(
     dataset,
     idxs,
     search_fn,
-    search_funcs,
+    graph_search_funcs,
+    reduce_classifier=True,
     transformable_feature_idxs=None,
     counter_kwargs=None,
-    **kwargs
+    graph_search_kwargs=None,
 ):
     """Find adversarial examples for specified indexes, and record statistics for reports.
 
-    :param dataset: Numpy datasets (X, y)
-    :param idxs: Example indices
-    :param search_fn: Graph search function
-    :param SearchFuncs search_funcs: Search functions
-    :param transformable_feature_idxs: Indexes of feature that can be transformed
-    :param counter_kwargs: Paramters passed to the :py:class:`ExpansionCounter`
-
-    The kwargs are passed directly to the search function call.
+    :param dataset: Numpy datasets (X, y).
+    :param idxs: Example indices.
+    :param search_fn: Graph search function.
+    :param reduce_classifier: Whether to use a reduced linear classifier as a substitute target.
+    :param SearchFuncs graph_search_funcs: Search functions.
+    :param transformable_feature_idxs: Indexes of feature that can be transformed.
+    :param counter_kwargs: Parameters passed to the :py:class:`ExpansionCounter`.
+    :param graph_search_kwargs: Parameters passed to the search function call.
 
     .. note::
 
@@ -333,6 +336,7 @@ def dataset_find_adversarial_examples(
     """
     logger = logging.getLogger(LOGGER_NAME)
     counter_kwargs = counter_kwargs or {}
+    graph_search_kwargs = graph_search_kwargs or {}
 
     # Dataframe for storing the results.
     results = pd.DataFrame(
@@ -365,16 +369,16 @@ def dataset_find_adversarial_examples(
             orig_example = orig_example.toarray()
 
         # If transformable_feature_idxs is specified, transform x and the classifier to operate in the reduced feature space.
-        orig_search_params = AdversarialExampleParams.get_default()
-        if transformable_feature_idxs is not None:
+        orig_problem_ctx = AdvProblemContext.get_default()
+        if transformable_feature_idxs is not None and reduce_classifier:
             clf_reduced = create_reduced_linear_classifier(
-                orig_search_params.clf, orig_example, transformable_feature_idxs
+                orig_problem_ctx.clf, orig_example, transformable_feature_idxs
             )
             example = orig_example[transformable_feature_idxs]
-            search_params = attr.evolve(orig_search_params, clf=clf_reduced)
+            problem_ctx = attr.evolve(orig_problem_ctx, clf=clf_reduced)
         else:
             example = orig_example
-            search_params = orig_search_params
+            problem_ctx = orig_problem_ctx
 
         # Instantiate a counter for expanded nodes, and a profiler.
         expanded_counter = ExpansionCounter(**counter_kwargs)
@@ -385,21 +389,21 @@ def dataset_find_adversarial_examples(
         real_cost, path_cost = None, None
         runtime, optimal_path = None, None
 
-        with per_example_profiler.as_default(), expanded_counter.as_default(), search_params.as_default():
+        with per_example_profiler.as_default(), expanded_counter.as_default(), problem_ctx.as_default():
             try:
                 # Find the adversarial example.
                 x_adv_reduced, path_costs, optimal_path = find_adversarial_example(
                     example=example,
                     search_fn=search_fn,
-                    search_funcs=search_funcs,
                     return_path=True,
-                    **kwargs
+                    graph_search_funcs=graph_search_funcs,
+                    graph_search_kwargs=graph_search_kwargs
                 )
                 if x_adv_reduced is None:
                     adv_found = False
                 else:
                     adv_found = True
-                    path_cost = path_costs[search_funcs.hash_fn(x_adv_reduced)]
+                    path_cost = path_costs[graph_search_funcs.hash_fn(x_adv_reduced)]
 
             except CounterLimitExceededError as e:
                 logger.debug("For example at index {}: {}".format(idx, e))
@@ -410,11 +414,11 @@ def dataset_find_adversarial_examples(
 
         # Initial confidence.
         init_confidence = clf_reduced.predict_proba([example])[
-            0, search_params.target_class
+            0, problem_ctx.target_class
         ]
 
         # Expansion functions used.
-        expands = [(idxs, fn.__name__) for (idxs, fn) in search_params.expansions]
+        expands = [(idxs, fn.__name__) for (idxs, fn) in problem_ctx.expansions]
 
         # Runtime statistics.
         runtime_stats = per_example_profiler.compute_stats()
@@ -429,18 +433,18 @@ def dataset_find_adversarial_examples(
                 )
             )
             # Construct the actual adversarial example.
-            if transformable_feature_idxs is not None:
-                x_adv = search_funcs.example_wrapper_fn(np.array(orig_example))
+            if transformable_feature_idxs is not None and reduce_classifier:
+                x_adv = graph_search_funcs.example_wrapper_fn(np.array(orig_example))
                 x_adv.src[transformable_feature_idxs] = x_adv_reduced.src
             else:
                 x_adv = x_adv_reduced
 
             # Compute further statistics.
-            adv_confidence = orig_search_params.clf.predict_proba([x_adv.src])[
-                0, orig_search_params.target_class
+            adv_confidence = orig_problem_ctx.clf.predict_proba([x_adv.src])[
+                0, orig_problem_ctx.target_class
             ]
-            real_cost = search_funcs.real_cost_fn(
-                search_funcs.example_wrapper_fn(orig_example), x_adv
+            real_cost = graph_search_funcs.real_cost_fn(
+                graph_search_funcs.example_wrapper_fn(orig_example), x_adv
             )
             difference, = np.where(orig_example != x_adv.src)
 
@@ -469,8 +473,10 @@ def experiment_wrapper(
     target_class=1.0,
     target_confidence=0.5,
     confidence_margin=1.0,
-    search_funcs=None,
-    search_kwargs=None,
+    reduce_classifier=True,
+    problem_params=None,
+    graph_search_funcs=None,
+    graph_search_kwargs=None,
     baseline_dataset_find_examples_fn=None,
     load_kwargs=None,
     get_expansions_fn=None,
@@ -487,18 +493,20 @@ def experiment_wrapper(
 
     :param load_transform_data_fn: A function that returns ``(X, y, features)``.
     :param clf_fit_fn: A function that returns a trained target model.
+    :param target_class: Target class for adversarial examples.
     :param target_confidence: Target confidence level for adversarial examples.
+    :param bool reduce_classifier: Whether to use :py:func:`create_reduce_linear_classifier` if possible.
     :param confidence_margin: Allows to only pick initial examples that are this far away from the target confidence.
-    :param SearchFuncs search_funcs: Search functions.
-    :param search_kwargs: Parameters passed to the search function.
-    :
+    :param problem_params: Extra parameters for :py:class:`AdvProblemContext`.
+    :param GraphSearchFuncs graph_search_funcs: Search functions.
+    :param graph_search_kwargs: Extra parameters passed directly to the graph search function.
     """
-    search_kwargs = search_kwargs or {}
     load_kwargs = load_kwargs or {}
     get_expansions_kwargs = get_expansions_kwargs or {}
     clf_fit_kwargs = clf_fit_kwargs or {}
     logger = logger or setup_custom_logger()
-    search_funcs = search_funcs or SearchFuncs()
+    graph_search_funcs = graph_search_funcs or GraphSearchFuncs()
+    graph_search_kwargs = graph_search_kwargs or {}
 
     random_state = 1 if random_state is None else random_state
     np.random.seed(random_state)
@@ -539,44 +547,45 @@ def experiment_wrapper(
     )
 
     # Estimate contribution of each (transformable) feature to the classifier performance.
-    logger.debug(
-        "Computing importance of each feature based on the classifier parameters."
-    )
+    # logger.debug(
+    #     "Computing importance of each feature based on the classifier parameters."
+    # )
     # importance_coef = get_feature_coef_importance(X, clf, transformable_feature_idxs)
     importance_coef = None
 
-    # Indices of examples in the original class.
+    # Indices of examples in the original class that are within a margin.
     preds = clf.predict_proba(X_test)[:, target_class]
     idxs, = np.where(
-        (preds < target_confidence) & (preds >= target_confidence - confidence_margin)
+        (preds < target_confidence) & (preds >= (target_confidence - confidence_margin))
     )
 
     # Perform adversarial example search using A* search.
     logger.debug(
-        "Searching for adversarial examples for {} observations using A* algorithm...".format(
+        "Searching for adversarial examples for {} examples using A*...".format(
             len(idxs)
         )
     )
-    search_params = AdversarialExampleParams(
+    problem_ctx = AdvProblemContext(
         clf=clf,
         expansions=expansions,
         target_class=target_class,
         target_confidence=target_confidence,
-        **search_kwargs
+        **problem_params
     )
-    with search_params.as_default():
+    with problem_ctx.as_default():
         search_results = dataset_find_adversarial_examples(
             dataset=X_test,
             idxs=idxs,
             transformable_feature_idxs=transformable_feature_idxs,
             search_fn=a_star_search,
-            search_funcs=search_funcs,
+            graph_search_funcs=graph_search_funcs,
+            graph_search_kwargs=graph_search_kwargs
         )
 
     # Compute feature importance based on the count of feature transformations.
-    logger.debug(
-        'Computing importance of each feature based on difference between "x" and adversarial "x".'
-    )
+    # logger.debug(
+    #     'Computing importance of each feature based on difference between "x" and adversarial "x".'
+    # )
     # importance_diff = get_feature_diff_importance(search_results['difference'], transformable_feature_idxs)
     importance_diff = None
 
@@ -584,24 +593,24 @@ def experiment_wrapper(
     baseline_results = None
     if baseline_dataset_find_examples_fn is not None:
         logger.debug(
-            "Searching for adversarial examples for {} observations using a baseline search...".format(
+            "Searching for adversarial examples for {} examples using a baseline search...".format(
                 len(idxs)
             )
         )
-        with search_params.as_default():
+        with problem_ctx.as_default():
             baseline_results = baseline_dataset_find_examples_fn(
                 dataset=X_test,
                 idxs=idxs,
                 transformable_feature_idxs=transformable_feature_idxs,
                 search_fn=a_star_search,
-                search_funcs=search_funcs,
+                graph_search_funcs=graph_search_funcs,
             )
 
-    # Compute average robustness of the correctly-classifier examples.
+    # Compute average robustness of the correctly classified examples.
     correctly_classified = X_test[clf.predict(X_test) == y_test]
     scores = clf.decision_function(correctly_classified)
     grad = clf.coef_[0]
-    grad_norm = np.linalg.norm(grad, ord=search_params.q_norm)
+    grad_norm = np.linalg.norm(grad, ord=problem_ctx.q_norm)
     robustness = np.abs(scores) / grad_norm
 
     # Output result.
