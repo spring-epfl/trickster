@@ -164,8 +164,12 @@ def load_data(
 ):
     """Load traces from a folder.
 
+    Monitored websites have label "0", unmonitored have "1".
+
     :param shuffle: Whether to shuffle the traces.
     :param max_traces: Max number of traces to load.
+
+    :return: Tuple (data, labels). Data is a list of traces.
 
     See :py:func:`load_cell_data` for information about the other arguments.
     """
