@@ -160,7 +160,7 @@ def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_len=Tr
 
 
 def load_data(
-    path, shuffle=False, max_traces=None, max_trace_len=None, filter_by_len=True
+    path, shuffle=False, max_traces=None, max_trace_len=None, filter_by_len=True, return_idxs=False
 ):
     """Load traces from a folder.
 
@@ -175,6 +175,7 @@ def load_data(
     """
     labels = []
     data = []
+    idxs = []
 
     filenames = os.listdir(path)
     if shuffle:
@@ -196,6 +197,7 @@ def load_data(
                 label = 0 if "-" in str(filename) else 1
                 data.append(trace)
                 labels.append(label)
+                idxs.append(filename)
 
                 num_traces += 1
                 prog_bar.update(1)
@@ -204,7 +206,11 @@ def load_data(
 
     labels = np.array(labels)
     data = np.array(data)
-    return data, labels
+    idxs = np.array(idxs)
+    if return_idxs:
+        return idxs, data, labels
+    else:
+        return data, labels
 
 
 def pad_and_onehot(data, pad_len=None, extra_padding=200):
