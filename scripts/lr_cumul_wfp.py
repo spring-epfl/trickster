@@ -56,9 +56,10 @@ class Datasets:
     X_test_cell = attr.ib()
     X_train_features = attr.ib()
     X_test_features = attr.ib()
-
     y_train = attr.ib()
     y_test = attr.ib()
+    idxs_train = attr.ib()
+    idxs_test = attr.ib()
 
 
 def prepare_data(
@@ -74,24 +75,27 @@ def prepare_data(
     logger = logging.getLogger(LOGGER_NAME)
     logger.info("Loading the data...")
 
-    X, y = load_data(
+    idxs, X, y = load_data(
         path=data_path,
         shuffle=shuffle,
         max_traces=max_traces,
         max_trace_len=max_trace_len,
         filter_by_len=filter_by_len,
+        return_idxs=True
     )
 
     logger.info("Loaded.")
 
     # Split into training and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1)
+    idxs_train, idxs_test, X_train, X_test, y_train, y_test = train_test_split(idxs, X, y, test_size=0.1)
 
     logger.info(
-        "Number of train samples: {}, Number test samples: {}".format(
+        "Number of train samples: {}, Number of test samples: {}".format(
             X_train.shape[0], X_test.shape[0]
         )
     )
+
+    logger.info("Extracting features...")
 
     # Extract features
     if features == "cumul":
@@ -130,6 +134,8 @@ def prepare_data(
         y_test=y_test,
         X_train_features=X_train_features,
         X_test_features=X_test_features,
+        idxs_train=idxs_train,
+        idxs_test=idxs_test,
     )
 
 
@@ -341,6 +347,7 @@ def run_wfp_experiment(
     results = pd.DataFrame(
         columns=[
             "index",
+            "filename",
             "found",
             "confidence",
             "original_confidence",
@@ -392,7 +399,7 @@ def run_wfp_experiment(
     logger.info("Searching for adversarial examples...")
 
     num_adv_examples_found = 0
-    for i, original_index in enumerate(tqdm(neg_indices)):
+    for i, original_index in enumerate(tqdm(neg_indices, ascii=True)):
         if (
             max_num_adv_examples is not None
             and num_adv_examples_found >= max_num_adv_examples
@@ -423,6 +430,7 @@ def run_wfp_experiment(
             # the number of expanded nodes.
             results.loc[i] = [
                 original_index,
+                datasets.idxs_test[original_index],
                 False,
                 None,
                 original_confidence,
@@ -442,6 +450,7 @@ def run_wfp_experiment(
 
             results.loc[i] = [
                 original_index,
+                datasets.idxs_test[original_index],
                 True,
                 confidence,
                 original_confidence,
