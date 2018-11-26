@@ -66,22 +66,23 @@ def test_training(file_factory, model, features):
         assert hasattr(clf.best_estimator_, "dual_coef_")
 
 
-@pytest.fixture
-def trained_model_pickle(file_factory):
+@pytest.fixture(params=['lr', 'svmrbf'])
+def trained_model(request, file_factory):
     with file_factory() as pickle_file:
         log = invoke_wfp_script(
             "train",
             model_pickle=pickle_file.name,
             data_path=DATA_PATH,
             features="cumul",
-            model="lr",
+            model=request.param,
             num_traces=MAX_TRACES,
         )
-        yield pickle_file
+        yield pickle_file, request.param
 
 
-def test_generation_success(file_factory, trained_model_pickle):
+def test_generation_success(file_factory, trained_model):
     with file_factory() as results_file:
+        trained_model_pickle, model_type = trained_model
         log = invoke_wfp_script(
             "generate",
             model_pickle=trained_model_pickle.name,
@@ -89,6 +90,7 @@ def test_generation_success(file_factory, trained_model_pickle):
             output_pickle=results_file.name,
             # Let's make the task easy.
             epsilon=100,
+            heuristic=model_type,
             num_adv_examples=1,
             confidence_level=0.1,
             iter_lim=10,
@@ -103,8 +105,9 @@ def test_generation_success(file_factory, trained_model_pickle):
     assert len(results) == 1
 
 
-def test_generation_sort_by_len(file_factory, trained_model_pickle):
+def test_generation_sort_by_len(file_factory, trained_model):
     with file_factory() as results_file:
+        trained_model_pickle, model_type = trained_model
         log = invoke_wfp_script(
             "generate",
             model_pickle=trained_model_pickle.name,
@@ -122,3 +125,4 @@ def test_generation_sort_by_len(file_factory, trained_model_pickle):
     for _, row in results.iterrows():
         assert prev_len is None or len(row.x) >= prev_len
         prev_len = len(row.x)
+

@@ -160,7 +160,13 @@ def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_len=Tr
 
 
 def load_data(
-    path, shuffle=False, max_traces=None, max_trace_len=None, filter_by_len=True, return_idxs=False
+    path,
+    shuffle=False,
+    max_traces=None,
+    max_trace_len=None,
+    filter_by_len=True,
+    return_idxs=False,
+    verbose=True,
 ):
     """Load traces from a folder.
 
@@ -168,10 +174,13 @@ def load_data(
 
     :param shuffle: Whether to shuffle the traces.
     :param max_traces: Max number of traces to load.
+    :param verbose: Whether to show progressbars.
 
     :return: Tuple (data, labels). Data is a list of traces.
 
     See :py:func:`load_cell_data` for information about the other arguments.
+
+    >>>
     """
     labels = []
     data = []
@@ -184,8 +193,14 @@ def load_data(
         filenames = sorted(filenames)
 
     num_traces = 0
-    prog_bar = tqdm(total=len(filenames) if max_traces is None else max_traces)
-    for filename in tqdm(filenames):
+    file_iter = filenames
+    if verbose:
+        prog_bar = tqdm(
+            total=len(filenames) if max_traces is None else max_traces, ascii=True
+        )
+        file_iter = tqdm(filenames, ascii=True)
+
+    for filename in file_iter:
         file_path = os.path.join(path, filename)
         if os.path.isfile(file_path):
             trace = load_cell_data(
@@ -200,7 +215,8 @@ def load_data(
                 idxs.append(filename)
 
                 num_traces += 1
-                prog_bar.update(1)
+                if verbose:
+                    prog_bar.update(1)
                 if max_traces is not None and num_traces >= max_traces:
                     break
 

@@ -261,7 +261,7 @@ def goal_fn(x):
 
 
 @profiled
-def heuristic_fn(x):
+def linear_heuristic_fn(x):
     """Distance to the decision boundary of a logistic regression classifier.
 
     NOTE: The value has to be zero if the example is already on the target side
@@ -276,6 +276,30 @@ def heuristic_fn(x):
     h = np.abs(score) / np.linalg.norm(
         problem_ctx.clf.coef_[0], ord=problem_ctx.q_norm
     )
+    return problem_ctx.epsilon * h
+
+
+@profiled
+def svm_rbf_heuristic_fn(x):
+    """First-order estimate of adversarial robustness of an SVM-RBF."""
+
+    problem_ctx = AdvProblemContext.get_default()
+    clf = problem_ctx.clf.best_estimator_
+
+    score = clf.decision_function([x.features])[0]
+    if score >= 0 and problem_ctx.target_class == 1:
+        return 0.0
+    if score <= 0 and problem_ctx.target_class == 0:
+        return 0.0
+
+    kernel_grads = []
+    for sv in clf.support_vectors_:
+        kernel_grads.append(
+            2 * clf.gamma * (x.features - sv) * \
+            np.exp(-clf.gamma * np.linalg.norm(sv - x.features, ord=2)))
+
+    grad = np.dot(clf.dual_coef_[0], np.array(kernel_grads))
+    h = np.abs(score) / np.linalg.norm(grad, ord=problem_ctx.q_norm)
     return problem_ctx.epsilon * h
 
 
@@ -317,6 +341,7 @@ def run_wfp_experiment(
     features="cumul",
     target_confidence=0.5,
     p_norm="1",
+    heuristic='linear',
     epsilon=1.0,
     shuffle=False,
     max_traces=None,
@@ -380,6 +405,12 @@ def run_wfp_experiment(
         max_len=max_trace_len,
         dummies_per_insertion=dummies_per_insertion,
     )
+
+    if heuristic == "lr":
+        heuristic_fn = linear_heuristic_fn
+    elif heuristic == "svmrbf":
+        heuristic_fn = svm_rbf_heuristic_fn
+
     graph_search_funcs = GraphSearchFuncs(
         example_wrapper_fn=lambda example: TraceNode(example, **node_params),
         expand_fn=expand_fn,
@@ -611,6 +642,12 @@ def train(
     show_default=True,
     help="Number of dummy packets to insert for each transformation.",
 )
+@click.option(
+    "--heuristic",
+    default="lr",
+    type=click.Choice(["lr", "svmrbf"]),
+    help="Heuristic to use.",
+)
 @click.option("--epsilon", default=1, show_default=True, help="The more the greedier.")
 @click.option(
     "--p_norm",
@@ -641,6 +678,7 @@ def generate(
     iter_lim,
     sort_by_len,
     dummies_per_insertion,
+    heuristic,
     epsilon,
     p_norm,
     output_pickle,
@@ -663,6 +701,7 @@ def generate(
         target_confidence=confidence_level,
         features=features,
         p_norm=p_norm,
+        heuristic=heuristic,
         epsilon=epsilon,
         iter_lim=iter_lim,
         max_trace_len=max_trace_len,
