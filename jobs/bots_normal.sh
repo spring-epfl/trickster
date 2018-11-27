@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NPROC=${NPROC:=4}
-CONFIDENCE_LEVEL="0.5"
+CONFIDENCE_LEVEL=0.5
 
 # Should be separated by commas. Choices of bands: "'1k', '100k', '1M', '10M'"
 BANDS="'1k'"
