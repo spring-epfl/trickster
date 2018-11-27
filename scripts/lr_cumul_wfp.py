@@ -425,7 +425,7 @@ def run_wfp_experiment(
     )
     neg_indices = list(neg_indices)
     if sort_by_len:
-        neg_indices = sorted(neg_indices, key=lambda i: len(datasets.X_test_cell[i]))
+        neg_indices = sorted(neg_indices, key=lambda i: -len(datasets.X_test_cell[i]))
 
     logger.info("Searching for adversarial examples...")
 
