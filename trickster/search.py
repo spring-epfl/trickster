@@ -119,7 +119,7 @@ def a_star_search(
         return None, None
 
 
-def _bounded_search_recusive(
+def _bounded_search_recursive(
     path, path_costs, bound, expand_fn, goal_fn, heuristic_fn, hash_fn, reverse_hashes
 ):
 
@@ -147,7 +147,7 @@ def _bounded_search_recusive(
             path_costs[hashed_neighbour] = path_costs[hashed_node] + cost
 
             # Call the search recursively on the neighbour with new path and costs.
-            output = _bounded_search_recusive(
+            output = _bounded_search_recursive(
                 path,
                 path_costs,
                 bound,
