@@ -108,13 +108,6 @@ def get_expansions_fn(features, expand_quantized_fn, **kwargs):
     return expansions, transformable_feature_idxs
 
 
-def baseline_dataset_find_examples_fn(graph_search_funcs=None, **kwargs):
-    """Perform BFS adversarial example search to baseline against A* search."""
-    graph_search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
-    results = dataset_find_adversarial_examples(graph_search_funcs=graph_search_funcs, **kwargs)
-    return results
-
-
 # Main function.
 if __name__ == "__main__":
     # Setup a custom logger.
@@ -125,7 +118,7 @@ if __name__ == "__main__":
     data_file = "data/german_credit/german_credit_data.csv"
 
     # Meta-experiment parameters.
-    bin_counts = [5, 50] + list(range(100, 1001, 100))
+    bin_levels = [5, 50] + list(range(100, 1001, 100))
     p_norm, q_norm = 1, np.inf
     epsilons = [0, 1, 2.5, 5, 10e5]
 
@@ -140,7 +133,7 @@ if __name__ == "__main__":
             "Loading and preprocessing input data for epsilon: {}...".format(epsilon)
         )
 
-        for bins in bin_counts:
+        for bins in bin_levels:
 
             logger.info(
                 "Loading and preprocessing input data for {} bins...".format(bins)
@@ -153,7 +146,6 @@ if __name__ == "__main__":
                 target_class=1,
                 get_expansions_fn=get_expansions_fn,
                 get_expansions_kwargs=dict(expand_quantized_fn=expand_quantized),
-                baseline_dataset_find_examples_fn=baseline_dataset_find_examples_fn,
                 logger=logger,
                 random_state=SEED,
             )
@@ -170,3 +162,4 @@ if __name__ == "__main__":
 
     with open(output_file, "wb") as f:
         pickle.dump(results, f)
+

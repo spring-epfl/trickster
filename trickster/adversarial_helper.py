@@ -16,7 +16,6 @@ import pandas as pd
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegressionCV
-from scipy import stats
 from scipy.sparse import issparse
 
 from collections import Counter as CollectionsCounter
@@ -229,8 +228,8 @@ def default_goal_fn(x):
 def default_heuristic_fn(x):
     """Distance to the decision boundary of a logistic regression classifier.
     By default the distance is w.r.t. L1 norm. This means that the denominator
-    has to be in terms of the Holder dual norm (`q_norm`), so L-inf. I know,
-    this interface is horrible.
+    has to be in terms of the Holder dual norm (`q_norm`), so L-inf.
+
     NOTE: The value has to be zero if the example is already on the target side
     of the boundary.
     """
@@ -258,8 +257,8 @@ def default_example_wrapper_fn(x):
 
 
 @profiled
-def default_real_cost_fn(x, another):
-    """Real cost for transforming example into another one."""
+def default_bench_cost_fn(x, another):
+    """Alternative cost function."""
     problem_ctx = AdvProblemContext.get_default()
     return np.linalg.norm(x.src - another.src, ord=problem_ctx.p_norm)
 
@@ -276,7 +275,7 @@ class GraphSearchFuncs:
     :param goal_fn: Predicate that tells whether a given node is a target node.
     :param heuristic_fn: Returns an estimate of how far the given example.
     :param hash_fn: Hash function for nodes.
-    :param real_cost_fn: An extra cost function between an example and adv. example used for analysis and reporting.
+    :param bench_cost_fn: An extra cost function between an example and adv. example used for analysis and reporting.
     """
 
     example_wrapper_fn = attr.ib(
@@ -286,7 +285,7 @@ class GraphSearchFuncs:
     goal_fn = attr.ib(default=attr.Factory(lambda: default_goal_fn))
     heuristic_fn = attr.ib(default=attr.Factory(lambda: default_heuristic_fn))
     hash_fn = attr.ib(default=attr.Factory(lambda: default_hash_fn))
-    real_cost_fn = attr.ib(default=attr.Factory(lambda: default_real_cost_fn))
+    bench_cost_fn = attr.ib(default=attr.Factory(lambda: default_bench_cost_fn))
 
 
 @profiled
@@ -347,7 +346,7 @@ def dataset_find_adversarial_examples(
             "init_confidence",
             "x_adv_features",
             "adv_confidence",
-            "real_cost",
+            "bench_cost",
             "path_cost",
             "path",
             "nodes_expanded",
@@ -384,26 +383,25 @@ def dataset_find_adversarial_examples(
         per_example_profiler = Profiler()
         Profiler.set_global_default(per_example_profiler)
 
-        AdvProblemContext.set_global_default(problem_ctx)
-
         x_adv = None
         x_adv_reduced = None
         x_adv_found = None
         adv_confidence = None
-        real_cost = None
+        bench_cost = None
         path_cost = None
         runtime = None
         path = None
 
         # Run the search.
         try:
-            x_adv_reduced, path_costs, path = find_adversarial_example(
-                example=example,
-                search_fn=search_fn,
-                return_path=True,
-                graph_search_funcs=graph_search_funcs,
-                graph_search_kwargs=graph_search_kwargs
-            )
+            with problem_ctx.as_default():
+                x_adv_reduced, path_costs, path = find_adversarial_example(
+                    example=example,
+                    search_fn=search_fn,
+                    return_path=True,
+                    graph_search_funcs=graph_search_funcs,
+                    graph_search_kwargs=graph_search_kwargs
+                )
             if x_adv_reduced is None:
                 x_adv_found = False
             else:
@@ -448,7 +446,7 @@ def dataset_find_adversarial_examples(
             adv_confidence = orig_problem_ctx.clf.predict_proba([x_adv.src])[
                 0, orig_problem_ctx.target_class
             ]
-            real_cost = graph_search_funcs.real_cost_fn(
+            bench_cost = graph_search_funcs.bench_cost_fn(
                 graph_search_funcs.example_wrapper_fn(orig_example), x_adv
             )
 
@@ -460,7 +458,7 @@ def dataset_find_adversarial_examples(
                 "init_confidence": init_confidence,
                 "x_adv_features": x_adv.src,
                 "adv_confidence": adv_confidence,
-                "real_cost": real_cost,
+                "bench_cost": bench_cost,
                 "path_cost": path_cost,
                 "path": path,
                 "nodes_expanded": nodes_expanded,
@@ -476,7 +474,7 @@ def dataset_find_adversarial_examples(
                 "init_confidence": init_confidence,
                 "x_adv_features": None,
                 "adv_confidence": None,
-                "real_cost": None,
+                "bench_cost": None,
                 "path_cost": None,
                 "path": None,
                 "nodes_expanded": nodes_expanded,
@@ -496,7 +494,6 @@ def experiment_wrapper(
     problem_params=None,
     graph_search_funcs=None,
     graph_search_kwargs=None,
-    baseline_dataset_find_examples_fn=None,
     load_kwargs=None,
     get_expansions_fn=None,
     get_expansions_kwargs=None,
@@ -608,23 +605,6 @@ def experiment_wrapper(
     # importance_diff = get_feature_diff_importance(search_results['difference'], transformable_feature_idxs)
     importance_diff = None
 
-    # Perform adversarial example search using a baseline search.
-    baseline_results = None
-    if baseline_dataset_find_examples_fn is not None:
-        logger.debug(
-            "Searching for adversarial examples for {} examples using a baseline search...".format(
-                len(idxs)
-            )
-        )
-        with problem_ctx.as_default():
-            baseline_results = baseline_dataset_find_examples_fn(
-                dataset=X_test,
-                idxs=idxs,
-                transformable_feature_idxs=transformable_feature_idxs,
-                search_fn=a_star_search,
-                graph_search_funcs=graph_search_funcs,
-            )
-
     # Compute average robustness of the correctly classified examples.
     correctly_classified = X_test[clf.predict(X_test) == y_test]
     scores = clf.decision_function(correctly_classified)
@@ -647,11 +627,10 @@ def experiment_wrapper(
         "avg_init_confidences": search_results["init_confidence"].mean(),
         "avg_adv_confidences": search_results["adv_confidence"].mean(),
         "avg_path_costs": search_results["path_cost"].mean(),
-        "avg_real_cost": search_results["real_cost"].mean(),
+        "avg_bench_cost": search_results["bench_cost"].mean(),
         "avg_counter": search_results["nodes_expanded"].mean(),
         "avg_runtime": search_results["runtime"].mean(),
         "avg_robustness": robustness.mean(),
-        "baseline_results": baseline_results,
         "search_results": search_results,
     }
 
