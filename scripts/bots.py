@@ -241,7 +241,7 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
 
 
 @click.command()
-@click.argument("epsilons", nargs=-1, type=float)
+@click.argument("epsilons", nargs=-1, required=True, type=float)
 @click.option(
     "--log_file",
     default="log/bots_output.log",
@@ -389,10 +389,10 @@ def generate(
 
             results.append(result)
 
-    logger.info("Saving output to {}.".format(output_pickle))
-
-    with open(output_pickle, "wb") as f:
-        pickle.dump(results, f)
+    if output_pickle is not None:
+        logger.info("Saving output to {}.".format(output_pickle))
+        with open(output_pickle, "wb") as f:
+            pickle.dump(results, f)
 
 
 if __name__ == "__main__":
