@@ -297,6 +297,7 @@ def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
 )
 @click.option(
     "--iter_lim",
+    type=int,
     default=None,
     show_default=True,
     help="Max number of search iterations until before giving up.",

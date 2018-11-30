@@ -6,7 +6,6 @@ TODO(bogdan): Rename this and possibly split across multiple modules.
 
 # Ignore warnings.
 import warnings
-
 warnings.filterwarnings("ignore")
 
 import logging
@@ -135,7 +134,7 @@ class ExpansionCounter:
                 "Expansion counter limit {} reached.".format(self.counter_lim)
             )
         if self.debug_freq is not None and self.count % self.debug_freq == 0:
-            logger.debug("Node counter is: {}.".format(self.count))
+            logger.debug("Counter is: {}.".format(self.count))
         self.count += 1
 
 
@@ -341,7 +340,7 @@ def dataset_find_adversarial_examples(
     # Dataframe for storing the results.
     results = pd.DataFrame(
         columns=[
-            "index",
+            "dataset_index",
             "found",
             "expansions",
             "x_features",
@@ -350,8 +349,7 @@ def dataset_find_adversarial_examples(
             "adv_confidence",
             "real_cost",
             "path_cost",
-            "optimal_path",
-            "difference",
+            "path",
             "nodes_expanded",
             "runtime",
         ]
@@ -382,31 +380,38 @@ def dataset_find_adversarial_examples(
 
         # Instantiate a counter for expanded nodes, and a profiler.
         expanded_counter = ExpansionCounter(**counter_kwargs)
+        ExpansionCounter.set_global_default(expanded_counter)
         per_example_profiler = Profiler()
+        Profiler.set_global_default(per_example_profiler)
 
-        x_adv, x_adv_reduced, adv_found = None, None, None
-        adv_confidence, difference = None, None
-        real_cost, path_cost = None, None
-        runtime, optimal_path = None, None
+        AdvProblemContext.set_global_default(problem_ctx)
 
-        with per_example_profiler.as_default(), expanded_counter.as_default(), problem_ctx.as_default():
-            try:
-                # Find the adversarial example.
-                x_adv_reduced, path_costs, optimal_path = find_adversarial_example(
-                    example=example,
-                    search_fn=search_fn,
-                    return_path=True,
-                    graph_search_funcs=graph_search_funcs,
-                    graph_search_kwargs=graph_search_kwargs
-                )
-                if x_adv_reduced is None:
-                    adv_found = False
-                else:
-                    adv_found = True
-                    path_cost = path_costs[graph_search_funcs.hash_fn(x_adv_reduced)]
+        x_adv = None
+        x_adv_reduced = None
+        x_adv_found = None
+        adv_confidence = None
+        real_cost = None
+        path_cost = None
+        runtime = None
+        path = None
 
-            except CounterLimitExceededError as e:
-                logger.debug("For example at index {}: {}".format(idx, e))
+        # Run the search.
+        try:
+            x_adv_reduced, path_costs, path = find_adversarial_example(
+                example=example,
+                search_fn=search_fn,
+                return_path=True,
+                graph_search_funcs=graph_search_funcs,
+                graph_search_kwargs=graph_search_kwargs
+            )
+            if x_adv_reduced is None:
+                x_adv_found = False
+            else:
+                x_adv_found = True
+                path_cost = path_costs[graph_search_funcs.hash_fn(x_adv_reduced)]
+
+        except CounterLimitExceededError as e:
+            logger.debug("For example at index {}: {}".format(idx, e))
 
         # Record some basic statistics.
         # - Number of node expansions.
@@ -418,7 +423,7 @@ def dataset_find_adversarial_examples(
         ]
 
         # Expansion functions used.
-        expands = [(idxs, fn.__name__) for (idxs, fn) in problem_ctx.expansions]
+        expansion_funcs = [(idxs, fn.__name__) for (idxs, fn) in problem_ctx.expansions]
 
         # Runtime statistics.
         runtime_stats = per_example_profiler.compute_stats()
@@ -426,7 +431,7 @@ def dataset_find_adversarial_examples(
             # Total time spent in the `find_adversarial_example` function.
             runtime = runtime_stats["find_adversarial_example"]["tot"]
 
-        if x_adv_reduced is not None:
+        if x_adv_found:
             logger.debug(
                 "Adversarial example {}/{} found from the initial index: {}!".format(
                     i, len(idxs), idx
@@ -446,23 +451,37 @@ def dataset_find_adversarial_examples(
             real_cost = graph_search_funcs.real_cost_fn(
                 graph_search_funcs.example_wrapper_fn(orig_example), x_adv
             )
-            difference, = np.where(orig_example != x_adv.src)
 
-        results.loc[i] = [
-            idx,
-            adv_found,
-            expands,
-            orig_example,
-            init_confidence,
-            x_adv.src,
-            adv_confidence,
-            real_cost,
-            path_cost,
-            optimal_path,
-            difference,
-            nodes_expanded,
-            runtime,
-        ]
+            results.loc[i] = {
+                "dataset_index": idx,
+                "found": x_adv_found,
+                "expansions": expansion_funcs,
+                "x_features": orig_example,
+                "init_confidence": init_confidence,
+                "x_adv_features": x_adv.src,
+                "adv_confidence": adv_confidence,
+                "real_cost": real_cost,
+                "path_cost": path_cost,
+                "path": path,
+                "nodes_expanded": nodes_expanded,
+                "runtime": runtime,
+            }
+
+        else:
+            results.loc[i] = {
+                "dataset_index": idx,
+                "found": x_adv_found,
+                "expansions": expansion_funcs,
+                "x_features": orig_example,
+                "init_confidence": init_confidence,
+                "x_adv_features": None,
+                "adv_confidence": None,
+                "real_cost": None,
+                "path_cost": None,
+                "path": None,
+                "nodes_expanded": nodes_expanded,
+                "runtime": runtime,
+            }
 
     return results
 
