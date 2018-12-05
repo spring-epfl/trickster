@@ -13,17 +13,34 @@ import numpy as np
 import pandas as pd
 import pickle
 
-from trickster.search import a_star_search, ida_star_search
-from trickster.adversarial_helper import *
-from trickster.expansions import *
+from trickster.search import a_star_search
+from trickster.optim import LpCategoricalProblemContext
+from trickster.optim import run_experiment
+from trickster.domain.categorical import expand_categorical, expand_quantized
+from trickster.domain.categorical import FeatureExpansionSpec
+from trickster.utils.log import setup_custom_logger
+
 from sklearn.linear_model import LogisticRegressionCV
+from sklearn.model_selection import train_test_split
 
 
 SEED = 1
 np.random.seed(seed=SEED)
 
 
-def load_transform_data_fn(data_file, bins, **kwargs):
+def find_substring_occurences(xs, item):
+    """Can be used to get the indexes of the required substring within a list of strings.
+
+    >>> find_substring_occurences(['ab', 'bcd', 'de'], 'd')
+    [1, 2]
+
+    """
+
+    idxs = [i for (i, x) in enumerate(xs) if item in x]
+    return idxs
+
+
+def load_transform_data(data_file, bins):
     """
     Load and preprocess data, returning the examples and labels as numpy.
     """
@@ -58,7 +75,7 @@ def load_transform_data_fn(data_file, bins, **kwargs):
     return X, y, df_X.columns
 
 
-def clf_fit_fn(X_train, y_train, **kwargs):
+def fit_clf(X_train, y_train, seed=1):
     """
     Fit logistic regression by performing a Grid Search with Cross Validation.
     """
@@ -73,14 +90,14 @@ def clf_fit_fn(X_train, y_train, **kwargs):
         penalty="l2",
         scoring=scoring,
         class_weight=class_weight,
-        random_state=SEED,
+        random_state=seed,
     )
 
     clf.fit(X_train, y_train)
     return clf
 
 
-def get_expansions_fn(features, expand_quantized_fn, **kwargs):
+def get_expansions_specs(features):
     """
     Define expansions to perform on features and obtain feature indexes.
     """
@@ -100,19 +117,12 @@ def get_expansions_fn(features, expand_quantized_fn, **kwargs):
 
     # Set required expansions for features in the reduced feature space.
     expansions = [
-        (idxs_credit, expand_quantized_fn),
-        (idxs_duration, expand_quantized_fn),
-        (idxs_purpose, expand_categorical),
+        FeatureExpansionSpec(idxs_credit, expand_quantized),
+        FeatureExpansionSpec(idxs_duration, expand_quantized),
+        FeatureExpansionSpec(idxs_purpose, expand_categorical),
     ]
 
     return expansions, transformable_feature_idxs
-
-
-def baseline_dataset_find_examples_fn(graph_search_funcs=None, **kwargs):
-    """Perform BFS adversarial example search to baseline against A* search."""
-    graph_search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
-    results = dataset_find_adversarial_examples(graph_search_funcs=graph_search_funcs, **kwargs)
-    return results
 
 
 # Main function.
@@ -125,8 +135,8 @@ if __name__ == "__main__":
     data_file = "data/german_credit/german_credit_data.csv"
 
     # Meta-experiment parameters.
-    bin_counts = [5, 50] + list(range(100, 1001, 100))
-    p_norm, q_norm = 1, np.inf
+    bin_levels = [5, 50] + list(range(100, 1001, 100))
+    p_norm = 1
     epsilons = [0, 1, 2.5, 5, 10e5]
 
     results = []
@@ -140,28 +150,37 @@ if __name__ == "__main__":
             "Loading and preprocessing input data for epsilon: {}...".format(epsilon)
         )
 
-        for bins in bin_counts:
+        for bins in bin_levels:
 
             logger.info(
                 "Loading and preprocessing input data for {} bins...".format(bins)
             )
-            result = experiment_wrapper(
-                load_transform_data_fn=load_transform_data_fn,
-                load_kwargs=dict(data_file=data_file, bins=bins),
-                problem_params=dict(p_norm=p_norm, q_norm=q_norm, epsilon=epsilon),
-                clf_fit_fn=clf_fit_fn,
-                target_class=1,
-                get_expansions_fn=get_expansions_fn,
-                get_expansions_kwargs=dict(expand_quantized_fn=expand_quantized),
-                baseline_dataset_find_examples_fn=baseline_dataset_find_examples_fn,
+            X, y, feature_names = load_transform_data(data_file=data_file, bins=bins)
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.1, random_state=SEED
+            )
+
+            logger.info("Fitting a model.")
+            clf = fit_clf(X_train, y_train, seed=SEED)
+            expansion_specs, transformable_feature_idxs = get_expansions_specs(
+                feature_names
+            )
+
+            problem_ctx = LpCategoricalProblemContext(
+                clf=clf, target_class=0, target_confidence=0.5, lp_space=p_norm,
+                expansion_specs=expansion_specs
+            )
+
+            result = run_experiment(
+                data=(X_test, y_test),
+                problem_ctx=problem_ctx,
+                transformable_feature_idxs=transformable_feature_idxs,
                 logger=logger,
-                random_state=SEED,
             )
 
             result["bins"] = bins
             result["epsilon"] = epsilon
             result["p_norm"] = p_norm
-            result["q_norm"] = q_norm
 
             results.append(result)
 

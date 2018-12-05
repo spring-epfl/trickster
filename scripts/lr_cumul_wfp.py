@@ -15,6 +15,7 @@ import argparse
 import logging
 import pprint
 import random
+import functools
 
 import attr
 import click
@@ -22,21 +23,19 @@ import numpy as np
 import pandas as pd
 
 from trickster.search import a_star_search
-from trickster.adversarial_helper import ExpansionCounter
-from trickster.adversarial_helper import AdvProblemContext, GraphSearchFuncs
-from trickster.adversarial_helper import find_adversarial_example
+from trickster.utils.counter import ExpansionCounter
+from trickster.optim import GraphSearchProblem, find_adversarial_example
+from trickster.lp import LpProblemContext
 from trickster.domain.wfp import extract, pad_and_onehot, load_data
 from trickster.domain.wfp import insert_dummy_packets
 from trickster.utils.log import LOGGER_NAME, setup_custom_logger
-from trickster.utils.cli import add_options
-from trickster.utils.norms import get_holder_conjugates
 
 from tqdm import tqdm
+from sklearn import preprocessing
+from sklearn.svm import SVC
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import LogisticRegressionCV
-from sklearn.svm import SVC
-from sklearn import preprocessing
 
 from defaultcontext import with_default_context
 from profiled import Profiler, profiled
@@ -50,6 +49,20 @@ def set_seed(seed=1):
     np.random.seed(seed)
 
 
+def add_options(options):
+    """Combine several click options in a single decorator.
+
+    https://github.com/pallets/click/issues/108#issuecomment-255547347
+    """
+
+    def _add_options(func):
+        for option in reversed(options):
+            func = option(func)
+        return func
+
+    return _add_options
+
+
 @attr.s
 class Datasets:
     X_train_cell = attr.ib()
@@ -60,6 +73,11 @@ class Datasets:
     y_test = attr.ib()
     idxs_train = attr.ib()
     idxs_test = attr.ib()
+
+
+@with_default_context
+class ProblemContext(LpProblemContext):
+    pass
 
 
 def prepare_data(
@@ -81,13 +99,15 @@ def prepare_data(
         max_traces=max_traces,
         max_trace_len=max_trace_len,
         filter_by_len=filter_by_len,
-        return_idxs=True
+        return_idxs=True,
     )
 
     logger.info("Loaded.")
 
     # Split into training and test sets
-    idxs_train, idxs_test, X_train, X_test, y_train, y_test = train_test_split(idxs, X, y, test_size=0.1)
+    idxs_train, idxs_test, X_train, X_test, y_train, y_test = train_test_split(
+        idxs, X, y, test_size=0.1
+    )
 
     logger.info(
         "Number of train samples: {}, Number of test samples: {}".format(
@@ -253,7 +273,7 @@ class TraceNode:
 @profiled
 def goal_fn(x):
     """Tell whether the example has reached the goal."""
-    problem_ctx = AdvProblemContext.get_default()
+    problem_ctx = ProblemContext.get_default()
     return (
         problem_ctx.clf.predict_proba([x.features])[0, problem_ctx.target_class]
         >= problem_ctx.target_confidence
@@ -267,15 +287,13 @@ def linear_heuristic_fn(x):
     NOTE: The value has to be zero if the example is already on the target side
     of the boundary.
     """
-    problem_ctx = AdvProblemContext.get_default()
+    problem_ctx = ProblemContext.get_default()
     score = problem_ctx.clf.decision_function([x.features])[0]
     if score >= 0 and problem_ctx.target_class == 1:
         return 0.0
     if score <= 0 and problem_ctx.target_class == 0:
         return 0.0
-    h = np.abs(score) / np.linalg.norm(
-        problem_ctx.clf.coef_[0], ord=problem_ctx.q_norm
-    )
+    h = np.abs(score) / np.linalg.norm(problem_ctx.clf.coef_[0], ord=problem_ctx.lp_space.q)
     return problem_ctx.epsilon * h
 
 
@@ -283,7 +301,7 @@ def linear_heuristic_fn(x):
 def svm_rbf_heuristic_fn(x):
     """First-order estimate of adversarial robustness of an SVM-RBF."""
 
-    problem_ctx = AdvProblemContext.get_default()
+    problem_ctx = ProblemContext.get_default()
     clf = problem_ctx.clf.best_estimator_
 
     score = clf.decision_function([x.features])[0]
@@ -295,20 +313,23 @@ def svm_rbf_heuristic_fn(x):
     kernel_grads = []
     for sv in clf.support_vectors_:
         kernel_grads.append(
-            2 * clf.gamma * (x.features - sv) * \
-            np.exp(-clf.gamma * np.linalg.norm(sv - x.features, ord=2)))
+            2
+            * clf.gamma
+            * (x.features - sv)
+            * np.exp(-clf.gamma * np.linalg.norm(sv - x.features, ord=2))
+        )
 
     grad = np.dot(clf.dual_coef_[0], np.array(kernel_grads))
-    h = np.abs(score) / np.linalg.norm(grad, ord=problem_ctx.q_norm)
+    h = np.abs(score) / np.linalg.norm(grad, ord=problem_ctx.lp_space.q)
     return problem_ctx.epsilon * h
 
 
 @profiled
 def expand_fn(x):
     children = x.expand()
-    problem_ctx = AdvProblemContext.get_default()
+    problem_ctx = ProblemContext.get_default()
     costs = [
-        np.linalg.norm(np.array(x.features - c.features), ord=problem_ctx.p_norm)
+        np.linalg.norm(np.array(x.features - c.features), ord=problem_ctx.lp_space.p)
         for c in children
     ]
 
@@ -341,7 +362,7 @@ def run_wfp_experiment(
     features="cumul",
     target_confidence=0.5,
     p_norm="1",
-    heuristic='linear',
+    heuristic="linear",
     epsilon=1.0,
     shuffle=False,
     max_traces=None,
@@ -386,18 +407,15 @@ def run_wfp_experiment(
         ]
     )
 
-    p_norm, q_norm = get_holder_conjugates(p_norm)
-
     # Set the global search parameters.
-    problem_ctx = AdvProblemContext(
+    problem_ctx = ProblemContext(
         clf=clf,
         target_class=1,
         target_confidence=target_confidence,
-        p_norm=p_norm,
-        q_norm=q_norm,
+        lp_space=p_norm,
         epsilon=epsilon,
     )
-    AdvProblemContext.set_global_default(problem_ctx)
+    ProblemContext.set_global_default(problem_ctx)
 
     # Set the A* search functions.
     node_params = dict(
@@ -411,8 +429,9 @@ def run_wfp_experiment(
     elif heuristic == "svmrbf":
         heuristic_fn = svm_rbf_heuristic_fn
 
-    graph_search_funcs = GraphSearchFuncs(
-        example_wrapper_fn=lambda example: TraceNode(example, **node_params),
+    graph_search_problem = GraphSearchProblem(
+
+        search_fn=a_star_search,
         expand_fn=expand_fn,
         goal_fn=goal_fn,
         heuristic_fn=heuristic_fn,
@@ -446,7 +465,9 @@ def run_wfp_experiment(
         Profiler.set_global_default(per_example_profiler)
 
         x_adv, path_cost = find_adversarial_example(
-            x, a_star_search, graph_search_funcs, graph_search_kwargs=dict(iter_lim=iter_lim)
+            initial_example_node=TraceNode(x, **node_params),
+            graph_search_problem=graph_search_problem,
+            iter_lim=iter_lim,
         )
 
         nodes_expanded = expanded_counter.count

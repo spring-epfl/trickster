@@ -111,6 +111,7 @@ def test_generation_sort_by_len(file_factory, trained_model):
         log = invoke_wfp_script(
             "generate",
             model_pickle=trained_model_pickle.name,
+            heuristic=model_type,
             data_path=DATA_PATH,
             output_pickle=results_file.name,
             sort_by_len=True,
@@ -123,6 +124,5 @@ def test_generation_sort_by_len(file_factory, trained_model):
     # Examples should be sorted by length.
     prev_len = None
     for _, row in results.iterrows():
-        assert prev_len is None or len(row.x) >= prev_len
+        assert prev_len is None or len(row.x) <= prev_len
         prev_len = len(row.x)
-
