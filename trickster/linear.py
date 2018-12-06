@@ -1,5 +1,5 @@
 """
-Tools for working with linear models.
+Tools for working with linear and linearized models.
 """
 
 import attr
@@ -32,10 +32,10 @@ def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
     a smaller feature space. This is done by fixing the score of the classifier on a static part of
     ``x``, and integrating it into the bias parameter of the reduced classifier.
 
-    For example, let $x = [1, 2, 3]$, weights of the classifier $w = [1, 1, 1]$ and bias term $b =
-    0$, and the only transformable feature index is 0. Then the reduced classifier has weights $w' =
-    [1]$, and the bias term incorporates the non-transformable part of $x$: $b' = -1 \cdot 2 + 1
-    \cdot 3$.
+    For example, let $$x = [1, 2, 3]$$, weights of the classifier $$w = [1, 1, 1]$$ and bias term $$b =
+    0$$, and the only transformable feature index is 0. Then the reduced classifier has weights $$w' =
+    [1]$$, and the bias term incorporates the non-transformable part of $$x$$: $$b' = -1 \cdot 2 + 1
+    \cdot 3$$.
 
     :param clf: Original logistic regression classifier
     :param x: An example

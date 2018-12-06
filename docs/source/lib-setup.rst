@@ -1,6 +1,6 @@
-==========
-Quickstart
-==========
+=============
+Library setup
+=============
 
 .. include:: ../../README.rst
    :start-after: lib-setup-marker-do-not-remove

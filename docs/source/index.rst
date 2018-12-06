@@ -8,16 +8,19 @@ trickster
 
 .. toctree::
    :maxdepth: 2
-   :caption: Experiments:
+   :caption: Usage
 
    exp-setup
+   lib-setup
 
 .. toctree::
    :maxdepth: 2
-   :caption: Trickster library
+   :caption: Trickster API
 
-   lib-setup
-   api
+   api/optim
+   api/linear
+   api/search
+   api/domain
 
 .. toctree::
    :maxdepth: 2

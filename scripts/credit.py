@@ -173,14 +173,12 @@ if __name__ == "__main__":
                 target_confidence=0.5,
                 lp_space=p_norm,
                 expansion_specs=expansion_specs,
-                epsilon=1
+                epsilon=1,
             )
 
             logger.info("Running the attack...")
             result = run_experiment(
-                data=(X_test, y_test),
-                problem_ctx=problem_ctx,
-                logger=logger,
+                data=(X_test, y_test), problem_ctx=problem_ctx, logger=logger
             )
 
             result["bins"] = bins
@@ -195,4 +193,3 @@ if __name__ == "__main__":
 
     with open(output_file, "wb") as f:
         pickle.dump(results, f)
-

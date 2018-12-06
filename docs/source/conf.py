@@ -43,7 +43,10 @@ release = __version__
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
+    'sphinx.ext.todo',
 ]
+
+mathjax_path = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

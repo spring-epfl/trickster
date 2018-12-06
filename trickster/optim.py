@@ -40,14 +40,16 @@ class CategoricalLpProblemContext(ProblemContext):
     :param clf: Target classifier.
     :param target_class: Target class.
     :param target_confidence: Target class confidence.
-    :param LpSpace $$L_p$$ space.
+    :param LpSpace lp_space: $$L_p$$ space.
     :param epsilon: Runtime-optimality trade-off parameter. 1 means optimal.
             More is sub-optimal but faster.
-    :param expansion_specs: List of categorical expansion specs.
+    :param expansion_specs: List of categorical expansion specs
+            (:py:class:`trickster.domain.categorical.FeatureExpansionSpec`)
 
     >>> problem_ctx = CategoricalLpProblemContext(
     ...     clf="stub", target_class=1, target_confidence=0.5,
     ...     lp_space="inf", epsilon=10)
+
 
     """
 
@@ -60,14 +62,14 @@ class CategoricalLpProblemContext(ProblemContext):
 
     def get_graph_search_problem(self):
         problem_ctx = self
-        expand_fn = ExpandFunc(problem_ctx=problem_ctx)
-        goal_fn = GoalFunc(problem_ctx=problem_ctx)
+        expand_fn = _ExpandFunc(problem_ctx=problem_ctx)
+        goal_fn = _GoalFunc(problem_ctx=problem_ctx)
 
         raw_heuristic = linear.LinearHeuristic(problem_ctx=problem_ctx)
         heuristic_fn = lambda x: raw_heuristic(x.features)
 
-        bench_cost_fn = BenchCost(problem_ctx=problem_ctx)
-        hash_fn = default_hash_fn
+        bench_cost_fn = _BenchCost(problem_ctx=problem_ctx)
+        hash_fn = _default_hash_fn
 
         return GraphSearchProblem(
             search_fn=a_star_search,
@@ -80,7 +82,7 @@ class CategoricalLpProblemContext(ProblemContext):
 
 
 @attr.s
-class ExpandFunc:
+class _ExpandFunc:
     """
     Expand candidates using given specs with each transformation having $L_p$ cost.
     """
@@ -99,7 +101,7 @@ class ExpandFunc:
 
 
 @attr.s
-class GoalFunc:
+class _GoalFunc:
     """Tells whether an example flips the decision of the classifier."""
     problem_ctx = attr.ib()
 
@@ -114,7 +116,7 @@ class GoalFunc:
 
 
 @attr.s
-class BenchCost:
+class _BenchCost:
     """Alternative cost function used for analyses and stats."""
     problem_ctx = attr.ib()
 
@@ -124,13 +126,13 @@ class BenchCost:
 
 
 @profiled
-def default_hash_fn(x):
+def _default_hash_fn(x):
     """Hash function for examples."""
     return hash(x.src.tostring())
 
 
 @profiled
-def find_adversarial_example(
+def _find_adversarial_example(
     initial_example_node, graph_search_problem, **kwargs
 ):
     """Run the graph search procedure for a single example
@@ -149,7 +151,7 @@ def find_adversarial_example(
 
 
 @profiled
-def dataset_find_adversarial_examples(
+def _dataset_find_adversarial_examples(
     data,
     idxs,
     problem_ctx,
@@ -237,7 +239,7 @@ def dataset_find_adversarial_examples(
         # Run the search.
         graph_search_problem = problem_ctx.get_graph_search_problem()
         try:
-            wrapped_x_adv, path_costs, path = find_adversarial_example(
+            wrapped_x_adv, path_costs, path = _find_adversarial_example(
                 initial_example_node=get_node_fn(example),
                 graph_search_problem=graph_search_problem,
                 return_path=True,
@@ -266,9 +268,9 @@ def dataset_find_adversarial_examples(
 
         # - Runtime statistics.
         runtime_stats = per_example_profiler.compute_stats()
-        if "find_adversarial_example" in runtime_stats:
-            # Total time spent in the `find_adversarial_example` function.
-            runtime = runtime_stats["find_adversarial_example"]["tot"]
+        if "_find_adversarial_example" in runtime_stats:
+            # Total time spent in the `_find_adversarial_example` function.
+            runtime = runtime_stats["_find_adversarial_example"]["tot"]
 
         if x_adv_found:
             logger.debug(
@@ -382,7 +384,7 @@ def run_experiment(
         transformable_feature_idxs.extend(spec.idxs)
     transformable_feature_idxs.sort()
 
-    search_results = dataset_find_adversarial_examples(
+    search_results = _dataset_find_adversarial_examples(
         data=X,
         idxs=idxs,
         problem_ctx=problem_ctx,
@@ -421,4 +423,3 @@ def run_experiment(
     }
 
     return result
-

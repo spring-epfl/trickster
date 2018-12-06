@@ -1,9 +1,6 @@
-=============
-Trickster API
-=============
-
-Graph search
-------------
+====================
+``trickster.search``
+====================
 
 .. automodule:: trickster.search
    :members:

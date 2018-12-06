@@ -24,7 +24,7 @@ import pandas as pd
 
 from trickster.search import a_star_search
 from trickster.utils.counter import ExpansionCounter
-from trickster.optim import GraphSearchProblem, find_adversarial_example
+from trickster.optim import GraphSearchProblem, _find_adversarial_example
 from trickster.base import ProblemContext
 from trickster.utils.lp import LpSpace
 from trickster.domain.wfp import extract, pad_and_onehot, load_data
@@ -300,7 +300,9 @@ def linear_heuristic_fn(x):
         return 0.0
     if score <= 0 and problem_ctx.target_class == 0:
         return 0.0
-    h = np.abs(score) / np.linalg.norm(problem_ctx.clf.coef_[0], ord=problem_ctx.lp_space.q)
+    h = np.abs(score) / np.linalg.norm(
+        problem_ctx.clf.coef_[0], ord=problem_ctx.lp_space.q
+    )
     return problem_ctx.epsilon * h
 
 
@@ -470,7 +472,7 @@ def run_wfp_experiment(
         per_example_profiler = Profiler()
         Profiler.set_global_default(per_example_profiler)
 
-        x_adv, path_cost = find_adversarial_example(
+        x_adv, path_cost = _find_adversarial_example(
             initial_example_node=TraceNode(x, **node_params),
             graph_search_problem=graph_search_problem,
             iter_lim=iter_lim,
@@ -478,7 +480,7 @@ def run_wfp_experiment(
 
         nodes_expanded = expanded_counter.count
         profiler_stats = per_example_profiler.compute_stats()
-        runtime = profiler_stats["find_adversarial_example"]["tot"]
+        runtime = profiler_stats["_find_adversarial_example"]["tot"]
 
         features = datasets.X_test_features[original_index]
         original_confidence = clf.predict_proba([features])[0, 1]
