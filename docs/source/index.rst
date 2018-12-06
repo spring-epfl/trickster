@@ -1,3 +1,7 @@
+.. image:: https://raw.githubusercontent.com/spring-epfl/trickster/master/trickster.svg?sanitize=true
+   :width: 150px
+   :align: right
+
 =========
 trickster
 =========
