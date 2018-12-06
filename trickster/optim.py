@@ -22,14 +22,61 @@ from defaultcontext import with_default_context
 from profiled import Profiler, profiled
 
 from trickster import linear
-from trickster.lp import LpProblemContext
 from trickster.search import a_star_search
-from trickster.domain.categorical import Node
+from trickster.base import ProblemContext, GraphSearchProblem
 from trickster.domain.categorical import FeatureExpansionSpec
+from trickster.domain.categorical import Node
+from trickster.utils.lp import LpSpace
 from trickster.utils.log import LOGGER_NAME
 from trickster.utils.log import setup_custom_logger
 from trickster.utils.counter import ExpansionCounter
 from trickster.utils.counter import CounterLimitExceededError
+
+
+@attr.s(auto_attribs=True)
+class CategoricalLpProblemContext(ProblemContext):
+    """Context for an optimal search instance in Lp space with categorical transformations.
+
+    :param clf: Target classifier.
+    :param target_class: Target class.
+    :param target_confidence: Target class confidence.
+    :param LpSpace $$L_p$$ space.
+    :param epsilon: Runtime-optimality trade-off parameter. 1 means optimal.
+            More is sub-optimal but faster.
+    :param expansion_specs: List of categorical expansion specs.
+
+    >>> problem_ctx = CategoricalLpProblemContext(
+    ...     clf="stub", target_class=1, target_confidence=0.5,
+    ...     lp_space="inf", epsilon=10)
+
+    """
+
+    clf: typing.Any
+    target_class: float
+    target_confidence: float = 0.5
+    epsilon: float = 1.0
+    lp_space: LpSpace = attr.ib(default=1, converter=LpSpace)
+    expansion_specs: typing.List[FeatureExpansionSpec] = attr.Factory(list)
+
+    def get_graph_search_problem(self):
+        problem_ctx = self
+        expand_fn = ExpandFunc(problem_ctx=problem_ctx)
+        goal_fn = GoalFunc(problem_ctx=problem_ctx)
+
+        raw_heuristic = linear.LinearHeuristic(problem_ctx=problem_ctx)
+        heuristic_fn = lambda x: raw_heuristic(x.features)
+
+        bench_cost_fn = BenchCost(problem_ctx=problem_ctx)
+        hash_fn = default_hash_fn
+
+        return GraphSearchProblem(
+            search_fn=a_star_search,
+            expand_fn=expand_fn,
+            heuristic_fn=heuristic_fn,
+            goal_fn=goal_fn,
+            hash_fn=hash_fn,
+            bench_cost_fn=bench_cost_fn
+        )
 
 
 @attr.s
@@ -49,20 +96,6 @@ class ExpandFunc:
         ]
 
         return list(zip(children, costs))
-
-
-@attr.s(auto_attribs=True)
-class LpCategoricalProblemContext(LpProblemContext):
-    """Context for an optimal search instance in Lp space with categorical transformations.
-
-    :param clf: Target classifier.
-    :param target_class: Target class.
-    :param target_confidence: Target class confidence.
-    :param LpSpace $L_p$ space.
-    :param epsilon: Epsilon for sub-optimal search.
-    :param expansion_specs: List of categorical expansion specs.
-    """
-    expansion_specs: typing.List[FeatureExpansionSpec] = attr.Factory(list)
 
 
 @attr.s
@@ -97,56 +130,6 @@ def default_hash_fn(x):
 
 
 @profiled
-def default_get_node_fn(x):
-    """Return a graph node corresponding to an example."""
-    return Node(src=x)
-
-
-@attr.s(auto_attribs=True)
-class GraphSearchProblem:
-    """
-    Functions that define a graph search instance.
-
-    :param search_fn: Graph search function.
-
-    :param expand_fn: Returns the expanded neighbour nodes for a given node.
-    :param goal_fn: Predicate that tells whether a given node is a target node.
-    :param heuristic_fn: Returns an estimate of how far the given example.
-    :param hash_fn: Hash function for nodes.
-    :param bench_cost_fn: An alternative cost function used for analysis and reporting.
-    """
-
-    search_fn: typing.Callable
-    expand_fn: typing.Callable
-    goal_fn: typing.Callable
-    heuristic_fn: typing.Callable
-    hash_fn: typing.Callable
-    bench_cost_fn: typing.Callable = None
-
-
-def default_make_graph_search_problem(problem_ctx):
-    """Construct an optimal instance of graph search from context."""
-
-    expand_fn = ExpandFunc(problem_ctx=problem_ctx)
-    goal_fn = GoalFunc(problem_ctx=problem_ctx)
-
-    raw_heuristic = linear.LinearHeuristic(problem_ctx=problem_ctx)
-    heuristic_fn = lambda x: raw_heuristic(x.features)
-
-    bench_cost_fn = BenchCost(problem_ctx=problem_ctx)
-    hash_fn = default_hash_fn
-
-    return GraphSearchProblem(
-        search_fn=a_star_search,
-        expand_fn=expand_fn,
-        heuristic_fn=heuristic_fn,
-        goal_fn=goal_fn,
-        hash_fn=hash_fn,
-        bench_cost_fn=bench_cost_fn
-    )
-
-
-@profiled
 def find_adversarial_example(
     initial_example_node, graph_search_problem, **kwargs
 ):
@@ -170,8 +153,6 @@ def dataset_find_adversarial_examples(
     data,
     idxs,
     problem_ctx,
-    get_node_fn=None,
-    make_graph_search_problem=None,
     transformable_feature_idxs=None,
     reduce_classifier=True,
     counter_kwargs=None,
@@ -182,7 +163,6 @@ def dataset_find_adversarial_examples(
     :param data: Iterable of examples.
     :param idxs: Indices of examples for which the search will be run.
     :param problem_ctx: Problem context.
-    :param get_node_fn: Function that returns a graph node corresponding to an example.
     :param reduce_classifier: Whether to use a reduced linear classifier.
     :param transformable_feature_idxs: Indices of features that can be transformed.
     :param counter_kwargs: Parameters passed to the :py:class:`trickster.utils.ExpansionCounter`.
@@ -192,7 +172,7 @@ def dataset_find_adversarial_examples(
     logger = logging.getLogger(LOGGER_NAME)
     counter_kwargs = counter_kwargs or {}
     graph_search_kwargs = graph_search_kwargs or {}
-    get_node_fn = get_node_fn or default_get_node_fn
+    get_node_fn = lambda x: Node(src=x)
 
     # Dataframe for storing the results.
     results = pd.DataFrame(columns=[
@@ -255,7 +235,7 @@ def dataset_find_adversarial_examples(
         path = None
 
         # Run the search.
-        graph_search_problem = make_graph_search_problem(problem_ctx)
+        graph_search_problem = problem_ctx.get_graph_search_problem()
         try:
             wrapped_x_adv, path_costs, path = find_adversarial_example(
                 initial_example_node=get_node_fn(example),
@@ -354,9 +334,6 @@ def run_experiment(
     data,
     confidence_margin=1.0,
     reduce_classifier=True,
-    get_node_fn=None,
-    transformable_feature_idxs=None,
-    expansion_specs=None,
     make_graph_search_problem=None,
     graph_search_kwargs=None,
     logger=None,
@@ -366,28 +343,17 @@ def run_experiment(
 
     An experiment finds adversarial examples for a given model and a given dataset.
 
-    TODO: This interface is pretty bad and not reusable. Would be great to figure out
-          smth. better.
-
-    :param problem_ctx: Search problem context.
-    :param data: Tuple (X, y)
-    :param confidence_margin: Pick initial examples that are at most this far away from the
-            target confidence.
-    :param bool reduce_classifier: Whether to use :py:func:`create_reduced_linear_classifier`
+    :param trickster.base.ProblemContext problem_ctx: Search problem context.
+    :param data: Data tuple (X, y)
+    :param float confidence_margin: Pick initial examples that are at most this far away from the
+            target confidence. Use this to get to relax the problem.
+    :param bool reduce_classifier: Whether to use :py:func:`trickster.linear.create_reduced_linear_classifier`
             if possible.
-    :param get_node_fn: Function that returns a graph node corresponding to an example.
-            If input examples are `raw`, e.g., numpy arrays, this function can be used to
-            wrap the examples in a :py:class:`Node` class.
-    :param transformable_feature_idxs: Indices of features that can be transformed.
-    :param expansion_specs: List of expansion :py:class:`FeatureExpansionSpec`.
-    :param make_graph_search_problem: Function that returns :py:class:`GraphSearchProblem` from
-            a problem context.
     :param graph_search_kwargs: Parameters passed to the search function call.
     :param logger: Logger instance.
     """
     logger = logger or setup_custom_logger()
     graph_search_kwargs = graph_search_kwargs or {}
-    make_graph_search_problem = make_graph_search_problem or default_make_graph_search_problem
 
     X, y = data
 
@@ -411,12 +377,16 @@ def run_experiment(
         )
     )
 
+    transformable_feature_idxs = []
+    for spec in problem_ctx.expansion_specs:
+        transformable_feature_idxs.extend(spec.idxs)
+    transformable_feature_idxs.sort()
+
     search_results = dataset_find_adversarial_examples(
         data=X,
         idxs=idxs,
         problem_ctx=problem_ctx,
         graph_search_kwargs=graph_search_kwargs,
-        make_graph_search_problem=make_graph_search_problem,
         transformable_feature_idxs=transformable_feature_idxs,
     )
 
@@ -451,3 +421,4 @@ def run_experiment(
     }
 
     return result
+

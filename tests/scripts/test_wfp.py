@@ -115,7 +115,6 @@ def test_generation_sort_by_len(file_factory, trained_model):
             data_path=DATA_PATH,
             output_pickle=results_file.name,
             sort_by_len=True,
-            heuristic=model_type,
 
             # Don't do any search.
             iter_lim=0,

@@ -25,7 +25,8 @@ import pandas as pd
 from trickster.search import a_star_search
 from trickster.utils.counter import ExpansionCounter
 from trickster.optim import GraphSearchProblem, find_adversarial_example
-from trickster.lp import LpProblemContext
+from trickster.base import ProblemContext
+from trickster.utils.lp import LpSpace
 from trickster.domain.wfp import extract, pad_and_onehot, load_data
 from trickster.domain.wfp import insert_dummy_packets
 from trickster.utils.log import LOGGER_NAME, setup_custom_logger
@@ -76,8 +77,14 @@ class Datasets:
 
 
 @with_default_context
-class ProblemContext(LpProblemContext):
-    pass
+@attr.s(auto_attribs=True)
+class WfpProblemContext(ProblemContext):
+    target_confidence: float = 0.5
+    epsilon: float = 1.0
+    lp_space: LpSpace = attr.ib(default=1, converter=LpSpace)
+
+    def get_graph_search_problem(self):
+        pass
 
 
 def prepare_data(
@@ -273,7 +280,7 @@ class TraceNode:
 @profiled
 def goal_fn(x):
     """Tell whether the example has reached the goal."""
-    problem_ctx = ProblemContext.get_default()
+    problem_ctx = WfpProblemContext.get_default()
     return (
         problem_ctx.clf.predict_proba([x.features])[0, problem_ctx.target_class]
         >= problem_ctx.target_confidence
@@ -287,7 +294,7 @@ def linear_heuristic_fn(x):
     NOTE: The value has to be zero if the example is already on the target side
     of the boundary.
     """
-    problem_ctx = ProblemContext.get_default()
+    problem_ctx = WfpProblemContext.get_default()
     score = problem_ctx.clf.decision_function([x.features])[0]
     if score >= 0 and problem_ctx.target_class == 1:
         return 0.0
@@ -301,7 +308,7 @@ def linear_heuristic_fn(x):
 def svm_rbf_heuristic_fn(x):
     """First-order estimate of adversarial robustness of an SVM-RBF."""
 
-    problem_ctx = ProblemContext.get_default()
+    problem_ctx = WfpProblemContext.get_default()
     clf = problem_ctx.clf.best_estimator_
 
     score = clf.decision_function([x.features])[0]
@@ -327,7 +334,7 @@ def svm_rbf_heuristic_fn(x):
 @profiled
 def expand_fn(x):
     children = x.expand()
-    problem_ctx = ProblemContext.get_default()
+    problem_ctx = WfpProblemContext.get_default()
     costs = [
         np.linalg.norm(np.array(x.features - c.features), ord=problem_ctx.lp_space.p)
         for c in children
@@ -408,14 +415,14 @@ def run_wfp_experiment(
     )
 
     # Set the global search parameters.
-    problem_ctx = ProblemContext(
+    problem_ctx = WfpProblemContext(
         clf=clf,
         target_class=1,
         target_confidence=target_confidence,
         lp_space=p_norm,
         epsilon=epsilon,
     )
-    ProblemContext.set_global_default(problem_ctx)
+    WfpProblemContext.set_global_default(problem_ctx)
 
     # Set the A* search functions.
     node_params = dict(
@@ -430,7 +437,6 @@ def run_wfp_experiment(
         heuristic_fn = svm_rbf_heuristic_fn
 
     graph_search_problem = GraphSearchProblem(
-
         search_fn=a_star_search,
         expand_fn=expand_fn,
         goal_fn=goal_fn,

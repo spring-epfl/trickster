@@ -19,7 +19,7 @@ from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import train_test_split
 
 from trickster.optim import run_experiment
-from trickster.optim import LpCategoricalProblemContext
+from trickster.optim import CategoricalLpProblemContext
 from trickster.utils.log import setup_custom_logger
 from trickster.search import a_star_search, ida_star_search
 from trickster.domain.categorical import *
@@ -358,7 +358,7 @@ def generate(
                 feature_names
             )
 
-            problem_ctx = LpCategoricalProblemContext(
+            problem_ctx = CategoricalLpProblemContext(
                 clf=clf,
                 target_class=0,
                 target_confidence=confidence_level,
@@ -372,9 +372,7 @@ def generate(
                 data=(X_test, y_test),
                 problem_ctx=problem_ctx,
                 graph_search_kwargs=dict(iter_lim=iter_lim),
-                expansion_specs=expansion_specs,
                 reduce_classifier=reduce_classifier,
-                transformable_feature_idxs=transformable_feature_idxs,
                 logger=logger,
             )
 

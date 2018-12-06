@@ -14,7 +14,7 @@ import pandas as pd
 import pickle
 
 from trickster.search import a_star_search
-from trickster.optim import LpCategoricalProblemContext
+from trickster.optim import CategoricalLpProblemContext
 from trickster.optim import run_experiment
 from trickster.domain.categorical import expand_categorical, expand_quantized
 from trickster.domain.categorical import FeatureExpansionSpec
@@ -135,7 +135,8 @@ if __name__ == "__main__":
     data_file = "data/german_credit/german_credit_data.csv"
 
     # Meta-experiment parameters.
-    bin_levels = [5, 50] + list(range(100, 1001, 100))
+    # bin_levels = [5, 50] + list(range(100, 1001, 100))
+    bin_levels = [5, 50, 100, 150]
     p_norm = 1
     epsilons = [0, 1, 2.5, 5, 10e5]
 
@@ -166,16 +167,19 @@ if __name__ == "__main__":
                 feature_names
             )
 
-            problem_ctx = LpCategoricalProblemContext(
-                clf=clf, target_class=0, target_confidence=0.5, lp_space=p_norm,
-                expansion_specs=expansion_specs
+            problem_ctx = CategoricalLpProblemContext(
+                clf=clf,
+                target_class=0,
+                target_confidence=0.5,
+                lp_space=p_norm,
+                expansion_specs=expansion_specs,
+                epsilon=1
             )
 
             logger.info("Running the attack...")
             result = run_experiment(
                 data=(X_test, y_test),
                 problem_ctx=problem_ctx,
-                transformable_feature_idxs=transformable_feature_idxs,
                 logger=logger,
             )
 
