@@ -180,6 +180,7 @@ if __name__ == "__main__":
             )
 
             result["bins"] = bins
+            result["features"] = feature_names
             result["epsilon"] = epsilon
             result["p_norm"] = p_norm
 

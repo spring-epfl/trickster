@@ -367,6 +367,7 @@ def generate(
                 epsilon=epsilon,
             )
 
+            logger.info("Running the attack...")
             result = run_experiment(
                 data=(X_test, y_test),
                 problem_ctx=problem_ctx,
@@ -378,6 +379,7 @@ def generate(
             )
 
             # Record extra data.
+            result["features"] = feature_names
             result["bins"] = bins
             result["epsilon"] = epsilon
             result["p_norm"] = p_norm

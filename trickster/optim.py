@@ -195,22 +195,20 @@ def dataset_find_adversarial_examples(
     get_node_fn = get_node_fn or default_get_node_fn
 
     # Dataframe for storing the results.
-    results = pd.DataFrame(
-        columns=[
-            "dataset_index",
-            "found",
-            "expansions",
-            "x_features",
-            "init_confidence",
-            "x_adv_features",
-            "adv_confidence",
-            "bench_cost",
-            "path_cost",
-            "path",
-            "nodes_expanded",
-            "runtime",
-        ]
-    )
+    results = pd.DataFrame(columns=[
+        "dataset_index",
+        "found",
+        "expansion_specs",
+        "x_features",
+        "init_confidence",
+        "x_adv_features",
+        "adv_confidence",
+        "bench_cost",
+        "path_cost",
+        "path",
+        "nodes_expanded",
+        "runtime",
+    ])
 
     for i, idx in enumerate(tqdm(idxs, ascii=True)):
         logger.debug(
@@ -283,7 +281,7 @@ def dataset_find_adversarial_examples(
 
         # - Expansion functions used.
         expansion_specs_repr = [
-            (s.idxs, s.expand_fn.__name__) for s in problem_ctx.expansion_specs
+            (s.feature_name, s.idxs, s.expand_fn.__name__) for s in problem_ctx.expansion_specs
         ]
 
         # - Runtime statistics.
