@@ -78,7 +78,6 @@ To download the datasets, run this:
 
 The datasets include:
 
-- Tao Wang's `website fingerprinting <https://www.cse.ust.hk/~taow/wf/data/>`__ "knndata"
 - Zafar Gilani's `Twitter bot classification dataset <https://www.cl.cam.ac.uk/~szuhg2/data.html>`__
 
 .. end-exp-setup-marker-do-not-remove
