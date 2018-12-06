@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+
 sys.path.append("..")
 
 # Ignore warnings.
@@ -14,12 +15,26 @@ import pickle
 import ast
 import pprint
 import click
-
-from trickster.search import a_star_search, ida_star_search
-from trickster.adversarial_helper import *
-from trickster.expansions import *
-from trickster.utils.norms import get_holder_conjugates
 from sklearn.linear_model import LogisticRegressionCV
+from sklearn.model_selection import train_test_split
+
+from trickster.optim import run_experiment
+from trickster.optim import LpCategoricalProblemContext
+from trickster.utils.log import setup_custom_logger
+from trickster.search import a_star_search, ida_star_search
+from trickster.domain.categorical import *
+
+
+def find_substring_occurences(xs, item):
+    """Can be used to get the indexes of the required substring within a list of strings.
+
+    >>> find_substring_occurences(['ab', 'bcd', 'de'], 'd')
+    [1, 2]
+
+    """
+
+    idxs = [i for (i, x) in enumerate(xs) if item in x]
+    return idxs
 
 
 def _transform_source_identity(X_k, sources_count=7):
@@ -43,7 +58,7 @@ def _transform_source_identity(X_k, sources_count=7):
     return X_k_transformed
 
 
-def load_transform_data_fn(human_dataset, bot_dataset, drop_features, bins, **kwargs):
+def load_transform_data(human_dataset, bot_dataset, drop_features, bins, **kwargs):
     """
     Load and preprocess data, returning the examples and labels as numpy.
     """
@@ -109,7 +124,7 @@ def load_transform_data_fn(human_dataset, bot_dataset, drop_features, bins, **kw
     return X, y, df_X.columns
 
 
-def clf_fit_fn(X_train, y_train, **kwargs):
+def fit_clf(X_train, y_train, seed=1):
     """
     Fit logistic regression by performing a Grid Search with Cross Validation.
     """
@@ -124,37 +139,19 @@ def clf_fit_fn(X_train, y_train, **kwargs):
         penalty="l2",
         scoring=scoring,
         class_weight=class_weight,
-        # FIXME: Use the supplied seed.
-        random_state=1,
+        random_state=seed,
     )
 
     clf.fit(X_train, y_train)
     return clf
 
 
-def get_expansions_fn(features, expanded_features=None, **kwargs):
+def get_expansions_specs(features=None):
     """
     Define expansions to perform on features and obtain feature indexes.
 
-    :param features: Feature names.
+    :param features: (Quantized) feature names.
     """
-
-    if expanded_features is None:
-        # Default features.
-        expanded_features = [
-            "source_identity",
-            "user_tweeted",
-            "user_retweeted",
-            "user_favourited",
-            "user_replied",
-            "likes_per_tweet",
-            "retweets_per_tweet",
-            "lists_per_user",
-            "age_of_account_in_days",
-            "source_count",
-            "urls_count",
-            "cdn_content_in_kb",
-        ]
 
     # Find indexes of required features in the original feature space.
     idxs_source_identity = find_substring_occurences(features, "source_identity")
@@ -163,13 +160,9 @@ def get_expansions_fn(features, expanded_features=None, **kwargs):
     idxs_favourited = find_substring_occurences(features, "user_favourited")
     idxs_replied = find_substring_occurences(features, "user_replied")
     idxs_likes_per_tweet = find_substring_occurences(features, "likes_per_tweet")
-    idxs_retweets_per_tweet = find_substring_occurences(
-        features, "retweets_per_tweet"
-    )
+    idxs_retweets_per_tweet = find_substring_occurences(features, "retweets_per_tweet")
     idxs_lists = find_substring_occurences(features, "lists_per_user")
-    idxs_age_of_account = find_substring_occurences(
-        features, "age_of_account_in_days"
-    )
+    idxs_age_of_account = find_substring_occurences(features, "age_of_account_in_days")
     idxs_sources_count = find_substring_occurences(features, "sources_count")
     idxs_urls = find_substring_occurences(features, "urls_count")
     idxs_cdn_content = find_substring_occurences(features, "cdn_content_in_kb")
@@ -215,29 +208,24 @@ def get_expansions_fn(features, expanded_features=None, **kwargs):
 
     # Set required expansions for features in the reduced feature space.
     expansions = [
-        (idxs_source_identity, expand_collection),
-        (idxs_tweeted, expand_quantized),
-        (idxs_retweeted, expand_quantized),
-        (idxs_favourited, expand_quantized),
-        (idxs_replied, expand_quantized),
-        (idxs_likes_per_tweet, expand_quantized),
-        (idxs_retweets_per_tweet, expand_quantized),
-        (idxs_lists, expand_quantized),
-        (idxs_age_of_account, expand_quantized_increment),
-        (idxs_sources_count, expand_quantized),
-        (idxs_urls, expand_quantized),
-        (idxs_cdn_content, expand_quantized),
+        FeatureExpansionSpec(idxs=idxs, expand_fn=fn, feature_name=name)
+        for (name, idxs, fn) in [
+            ("source_identity", idxs_source_identity, expand_collection),
+            ("tweeted", idxs_tweeted, expand_quantized),
+            ("retweeted", idxs_retweeted, expand_quantized),
+            ("favourited", idxs_favourited, expand_quantized),
+            ("replied", idxs_replied, expand_quantized),
+            ("likes_per_tweet", idxs_likes_per_tweet, expand_quantized),
+            ("retweets_per_tweet", idxs_retweets_per_tweet, expand_quantized),
+            ("lists", idxs_lists, expand_quantized),
+            ("age_of_account", idxs_age_of_account, expand_quantized_increment),
+            ("sources_count", idxs_sources_count, expand_quantized),
+            ("urls", idxs_urls, expand_quantized),
+            ("cdn_content", idxs_cdn_content, expand_quantized),
+        ]
     ]
 
     return expansions, transformable_feature_idxs
-
-
-# Not used.
-def baseline_detaset_find_examples_fn(search_funcs=None, **kwargs):
-    """Perform BFS adversarial example search to baseline against A* search."""
-    search_funcs.heuristic_fn = lambda *args, **lambda_kwargs: 0
-    results = dataset_find_adversarial_examples(search_funcs=search_funcs, **kwargs)
-    return results
 
 
 @click.command()
@@ -316,13 +304,11 @@ def generate(
     p_norm,
     confidence_level,
     output_pickle,
-    iter_lim
+    iter_lim,
 ):
     np.random.seed(seed=seed)
     logger = setup_custom_logger(log_file)
     logger.info("Params: %s" % pprint.pformat(ctx.params))
-
-    p_norm, q_norm = get_holder_conjugates(p_norm)
 
     # Dataset locations.
     human_dataset = human_dataset_template.format(popularity_band)
@@ -356,36 +342,45 @@ def generate(
             logger.info(
                 "Loading and preprocessing input data for {} bins...".format(bins)
             )
-            result = experiment_wrapper(
-                load_transform_data_fn=load_transform_data_fn,
-                load_kwargs=dict(
-                    human_dataset=human_dataset,
-                    bot_dataset=bot_dataset,
-                    drop_features=drop_features,
-                    bins=bins,
-                ),
-                problem_params=dict(
-                    p_norm=p_norm,
-                    q_norm=q_norm,
-                    epsilon=epsilon,
-                ),
-                graph_search_kwargs=dict(
-                    iter_lim=iter_lim
-                ),
-                clf_fit_fn=clf_fit_fn,
+            X, y, feature_names = load_transform_data(
+                human_dataset=human_dataset,
+                bot_dataset=bot_dataset,
+                drop_features=drop_features,
+                bins=bins,
+            )
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.1, random_state=seed
+            )
+
+            logger.info("Fitting a model.")
+            clf = fit_clf(X_train, y_train, seed=seed)
+            expansion_specs, transformable_feature_idxs = get_expansions_specs(
+                feature_names
+            )
+
+            problem_ctx = LpCategoricalProblemContext(
+                clf=clf,
                 target_class=0,
                 target_confidence=confidence_level,
-                get_expansions_fn=get_expansions_fn,
+                lp_space=p_norm,
+                expansion_specs=expansion_specs,
+                epsilon=epsilon,
+            )
+
+            result = run_experiment(
+                data=(X_test, y_test),
+                problem_ctx=problem_ctx,
+                graph_search_kwargs=dict(iter_lim=iter_lim),
+                expansion_specs=expansion_specs,
                 reduce_classifier=reduce_classifier,
+                transformable_feature_idxs=transformable_feature_idxs,
                 logger=logger,
-                random_state=seed,
             )
 
             # Record extra data.
             result["bins"] = bins
             result["epsilon"] = epsilon
             result["p_norm"] = p_norm
-            result["q_norm"] = q_norm
 
             results.append(result)
 
