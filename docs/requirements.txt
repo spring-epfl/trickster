@@ -32,5 +32,4 @@ sphinx-rtd-theme==0.4.2
 sphinxcontrib-websupport==1.1.0
 toml==0.10.0
 tqdm==4.28.1
--e git+git@github.com:bogdan-kulynych/trickster.git@c93c5c7629a3e9656cd5de7434b13f7ad5d26213#egg=trickster
 urllib3==1.24.1
