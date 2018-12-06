@@ -5,7 +5,16 @@ import re
 from setuptools import setup
 
 
-INSTALL_REQUIRES = ["numpy", "scipy", "scikit-learn", "attrs", "tqdm", "boltons"]
+INSTALL_REQUIRES = [
+    "numpy",
+    "scipy",
+    "scikit-learn",
+    "attrs",
+    "tqdm",
+    "boltons",
+    "profiled",
+    "pandas",
+]
 
 SETUP_REQUIRES = ["pytest-runner"]
 
