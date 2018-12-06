@@ -18,7 +18,6 @@ from scipy.sparse import issparse
 
 from tqdm import tqdm
 from collections import Counter as CollectionsCounter
-from defaultcontext import with_default_context
 from profiled import Profiler, profiled
 
 from trickster import linear
@@ -336,6 +335,7 @@ def run_experiment(
     data,
     confidence_margin=1.0,
     reduce_classifier=True,
+    transformable_feature_idxs=None,
     make_graph_search_problem=None,
     graph_search_kwargs=None,
     logger=None,
@@ -349,9 +349,9 @@ def run_experiment(
     :param data: Data tuple (X, y)
     :param float confidence_margin: Pick initial examples that are at most this far away from the
             target confidence. Use this to get to relax the problem.
-    :param bool reduce_classifier: Whether to use :py:func:`trickster.linear.create_reduced_linear_classifier`
-            if possible.
-    :param graph_search_kwargs: Parameters passed to the search function call.
+    :param bool reduce_classifier: Whether to use :py:func:`trickster.linear.create_reduced_linear_classifier` if possible.
+    :param list transformable_feature_idxs:
+    :param dict graph_search_kwargs: Parameters passed to the search function call.
     :param logger: Logger instance.
     """
     logger = logger or setup_custom_logger()
@@ -378,11 +378,6 @@ def run_experiment(
             len(idxs)
         )
     )
-
-    transformable_feature_idxs = []
-    for spec in problem_ctx.expansion_specs:
-        transformable_feature_idxs.extend(spec.idxs)
-    transformable_feature_idxs.sort()
 
     search_results = _dataset_find_adversarial_examples(
         data=X,

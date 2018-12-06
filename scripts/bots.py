@@ -373,6 +373,7 @@ def generate(
                 problem_ctx=problem_ctx,
                 graph_search_kwargs=dict(iter_lim=iter_lim),
                 reduce_classifier=reduce_classifier,
+                transformable_feature_idxs=transformable_feature_idxs,
                 logger=logger,
             )
 
