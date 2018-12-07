@@ -4,7 +4,7 @@ python:
 install:
   - pip install -e .[test] --quiet
   - pip install -r requirements.txt --quiet
-  - sudo apt install parallel unzip
+  - sudo apt install unzip
   - make data
 script:
   - pytest
