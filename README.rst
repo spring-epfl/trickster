@@ -6,9 +6,12 @@
 trickster
 =========
 
-.. image:: https://readthedocs.org/projects/trickster-lib/badge/?version=latest
+|travis| |docs|
+
+.. |docs| image:: https://readthedocs.org/projects/trickster-lib/badge/?version=latest
    :alt: Docs
-.. image:: https://travis-ci.org/spring-epfl/trickster.svg?branch=master
+
+.. |travis| image:: https://travis-ci.org/spring-epfl/trickster.svg?branch=master
    :alt: Travis
 
 .. description-marker-do-not-remove
