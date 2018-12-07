@@ -16,7 +16,7 @@ Library and experiments for attacking machine learning in discrete domains `usin
 
 .. end-description-marker-do-not-remove
 
-See the `documentation <https://trickster-lib.readthedocs.io/en/latest/>` on ReadTheDocs.
+See the `documentation <https://trickster-lib.readthedocs.io/en/latest/>`__ on ReadTheDocs.
 
 
 Setup
@@ -72,11 +72,6 @@ The datasets include:
 - Zafar Gilani's `Twitter bot classification dataset <https://www.cl.cam.ac.uk/~szuhg2/data.html>`__
 
 .. end-exp-setup-marker-do-not-remove
-
-Development
-===========
-
-See `DEVELOPMENT.rst <DEVELOPMENT.rst>`__
 
 Citing
 ======
