@@ -30,6 +30,8 @@ trickster
    :maxdepth: 2
    :caption: Misc
 
+   citing
+   acks
    license
 
 
