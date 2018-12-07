@@ -9,9 +9,11 @@ trickster
 |travis| |docs|
 
 .. |docs| image:: https://readthedocs.org/projects/trickster-lib/badge/?version=latest
+   :target: https://trickster-lib.readthedocs.io/en/latest/
    :alt: Docs
 
 .. |travis| image:: https://travis-ci.org/spring-epfl/trickster.svg?branch=master
+   :target: https://travis-ci.org/spring-epfl/trickster
    :alt: Travis
 
 .. description-marker-do-not-remove
