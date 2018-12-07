@@ -115,11 +115,16 @@ example that incurs minimal transformation cost to the adversary:
 
 .. code-block:: python
 
-    import trickster
+    from trickster.search import a_star_search
 
     x = TwitterAccount(num_own_tweets=15, num_likes=5)
 
-    adv_x, cost = trickster.search.a_star_search(x, expand_fn=expand_fn, goal_fn=goal_fn, return_path=False)
+    adv_x, cost = a_star_search(
+        start_node=x,
+        expand_fn=expand_fn,
+        goal_fn=goal_fn,
+        hash_fn=hash_fn
+    )
     print('Adversarial account: %s. Cost of the attack: %d' % (adv_x, cost))
 
     # Adversarial account: TwitterAccount(num_own_tweets=5, num_likes=5). Cost of the attack: 10
