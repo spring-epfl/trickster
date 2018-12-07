@@ -23,8 +23,8 @@ Library and experiments for attacking machine learning in discrete domains `usin
 
 .. end-description-marker-do-not-remove
 
-See the `documentation <https://trickster-lib.readthedocs.io/en/latest/>`__ on ReadTheDocs.
-
+See the `documentation <https://trickster-lib.readthedocs.io/en/latest/>`__ on Readthedocs, or jump
+directly to the `guide <https://trickster-lib.readthedocs.io/en/latest/guide.html>`__.
 
 Setup
 =====
