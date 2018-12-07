@@ -6,12 +6,17 @@
 trickster
 =========
 
+.. image:: https://readthedocs.org/projects/trickster-lib/badge/?version=latest
+   :alt: Docs
+
 .. description-marker-do-not-remove
 
 Library and experiments for attacking machine learning in discrete domains `using graph search
 <https://arxiv.org/abs/1810.10939>`__.
 
 .. end-description-marker-do-not-remove
+
+See the `documentation <https://trickster-lib.readthedocs.io/en/latest/>` on ReadTheDocs.
 
 
 Setup
