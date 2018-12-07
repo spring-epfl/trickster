@@ -65,7 +65,7 @@ def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
 
 @attr.s
 class LinearHeuristic:
-    r"""$L_p$ distance to the decision boundary of a linear or linearized classifier.
+    r"""$$L_p$$ distance to the decision boundary of a linear or linearized classifier.
 
     :param trickster.lp.LpProblemCtx problem_ctx: Problem context.
 
