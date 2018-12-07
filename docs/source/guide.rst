@@ -63,8 +63,8 @@ see that other transformations are compositions of these.
     def expand_fn(x):
         yield attr.evolve(x, num_own_tweets=x.num_own_tweets + 1), 1
         yield attr.evolve(x, num_own_tweets=x.num_own_tweets - 1), 1
-        yield attr.evolve(x, num_own_tweets=x.num_likes + 1), 10
-        yield attr.evolve(x, num_own_tweets=x.num_likes - 1), 1
+        yield attr.evolve(x, num_likes=x.num_likes + 1), 10
+        yield attr.evolve(x, num_likes=x.num_likes - 1), 1
 
     x = TwitterAccount(num_own_tweets=15, num_likes=5)
     for transformation, cost in expand_fn(x):
