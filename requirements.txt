@@ -59,7 +59,6 @@ parso==0.2.1
 pbr==4.2.0
 pexpect==4.6.0
 pickleshare==0.7.4
-pkg-resources==0.0.0
 pluggy==0.6.0
 profiled==0.1.0
 prompt-toolkit==1.0.15
