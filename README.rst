@@ -40,6 +40,8 @@ Install the trickster library as a Python package:
 
     pip install -e git+git://github.com/spring-epfl/trickster#egg=trickster
 
+Note that trickster requires Python **3.6**.
+
 .. end-lib-setup-marker-do-not-remove
 
 Experiments

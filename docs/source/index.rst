@@ -14,8 +14,7 @@ trickster
    :maxdepth: 2
    :caption: Usage
 
-   exp-setup
-   lib-setup
+   setup
    guide
 
 .. toctree::
