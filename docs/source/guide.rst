@@ -132,13 +132,13 @@ needs to delete some tweets from the account.
 This adversarial example is provably minimal, at the cost of extensive traversal of the
 transformation graph. Next sections describe how to do better.
 
-Using heuristics (TBD)
-----------------------
+Using heuristics
+----------------
 
 The search can be sped up using heuristics. This section is coming up.
 
-Optimal setup (:py:mod:`trickster.optim`) (TBD)
------------------------------------------------
+Optimal setup (:py:mod:`trickster.optim`)
+-----------------------------------------
 
 For some settings, one can find provably minimal examples even when using heuristics. This section is
 coming up.
