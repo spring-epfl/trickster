@@ -16,6 +16,7 @@ trickster
 
    exp-setup
    lib-setup
+   guide
 
 .. toctree::
    :maxdepth: 2
