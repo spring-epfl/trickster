@@ -9,6 +9,9 @@ trickster
 .. image:: https://readthedocs.org/projects/trickster-lib/badge/?version=latest
    :alt: Docs
 
+.. image:: https://travis-ci.org/spring-epfl/trickster.svg?branch=master
+   :alt: Travis
+
 .. description-marker-do-not-remove
 
 Library and experiments for attacking machine learning in discrete domains `using graph search
@@ -69,6 +72,7 @@ To download the datasets, run this:
 
 The datasets include:
 
+- UCI `German credit dataset <https://archive.ics.uci.edu/ml/datasets/statlog+(german+credit+data)>`__
 - Zafar Gilani's `Twitter bot classification dataset <https://www.cl.cam.ac.uk/~szuhg2/data.html>`__
 
 .. end-exp-setup-marker-do-not-remove
