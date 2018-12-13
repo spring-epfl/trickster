@@ -4,6 +4,7 @@ Tools for working with linear and linearized models.
 
 import attr
 import numpy as np
+import scipy as sp
 from profiled import profiled
 
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
@@ -11,6 +12,10 @@ from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 
 def _get_forward_grad_lr(clf, x, target_class=None):
     return clf.coef_[0]
+
+
+def _get_forward_grad_default(clf, x, target_class=None):
+    return clf.grad(x, target_class)
 
 
 def get_forward_grad(clf, x, target_class=None):
@@ -23,6 +28,9 @@ def get_forward_grad(clf, x, target_class=None):
 
     if isinstance(clf, LogisticRegressionCV) or isinstance(clf, LogisticRegression):
         return _get_forward_grad_lr(clf, x, target_class)
+
+    else:
+        return _get_forward_grad_default(clf, x, target_class)
 
 
 def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
@@ -68,8 +76,6 @@ class LinearHeuristic:
     r"""$$L_p$$ distance to the decision boundary of a linear or linearized classifier.
 
     :param trickster.lp.LpProblemCtx problem_ctx: Problem context.
-
-    TODO: This is wrong if target confidence is different than 0.5
     """
 
     problem_ctx = attr.ib()
@@ -80,7 +86,11 @@ class LinearHeuristic:
         confidence = ctx.clf.predict_proba([x])[0, ctx.target_class]
         if confidence >= ctx.target_confidence:
             return 0.0
+
         score = ctx.clf.decision_function([x])[0]
+        if ctx.target_confidence != 0.5:
+            score -= sp.special.logit(ctx.target_confidence)
+
         fgrad = get_forward_grad(ctx.clf, x, target_class=ctx.target_class)
         h = np.abs(score) / np.linalg.norm(fgrad, ord=ctx.lp_space.q)
         return h * ctx.epsilon
