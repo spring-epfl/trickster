@@ -58,5 +58,5 @@ def test_generation(file_factory):
         results = pd.read_pickle(results_file.name)
 
     # One example is expected to be found.
-    assert len(results[0]['search_results'].found) > 0
-    assert len(results[0]['search_results']) == 41
+    assert len(results[0]["search_results"].found) > 0
+    assert len(results[0]["search_results"]) == 41

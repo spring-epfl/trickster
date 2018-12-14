@@ -76,7 +76,7 @@ class CategoricalLpProblemContext(ProblemContext):
             heuristic_fn=heuristic_fn,
             goal_fn=goal_fn,
             hash_fn=hash_fn,
-            bench_cost_fn=bench_cost_fn
+            bench_cost_fn=bench_cost_fn,
         )
 
 
@@ -102,6 +102,7 @@ class _ExpandFunc:
 @attr.s
 class _GoalFunc:
     """Tells whether an example flips the decision of the classifier."""
+
     problem_ctx = attr.ib()
 
     @profiled
@@ -117,11 +118,14 @@ class _GoalFunc:
 @attr.s
 class _BenchCost:
     """Alternative cost function used for analyses and stats."""
+
     problem_ctx = attr.ib()
 
     @profiled
     def __call__(self, x, another):
-        return np.linalg.norm(x.features - another.features, ord=self.problem_ctx.lp_space.q)
+        return np.linalg.norm(
+            x.features - another.features, ord=self.problem_ctx.lp_space.q
+        )
 
 
 @profiled
@@ -131,9 +135,7 @@ def _default_hash_fn(x):
 
 
 @profiled
-def _find_adversarial_example(
-    initial_example_node, graph_search_problem, **kwargs
-):
+def _find_adversarial_example(initial_example_node, graph_search_problem, **kwargs):
     """Run the graph search procedure for a single example
 
     :param initial_example_node: Graph node corresponding to the initial examplean
@@ -145,7 +147,7 @@ def _find_adversarial_example(
         goal_fn=graph_search_problem.goal_fn,
         heuristic_fn=graph_search_problem.heuristic_fn,
         hash_fn=graph_search_problem.hash_fn,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -176,20 +178,22 @@ def _dataset_find_adversarial_examples(
     get_node_fn = lambda x: Node(src=x)
 
     # Dataframe for storing the results.
-    results = pd.DataFrame(columns=[
-        "dataset_index",
-        "found",
-        "expansion_specs",
-        "x_features",
-        "init_confidence",
-        "x_adv_features",
-        "adv_confidence",
-        "bench_cost",
-        "path_cost",
-        "path",
-        "nodes_expanded",
-        "runtime",
-    ])
+    results = pd.DataFrame(
+        columns=[
+            "dataset_index",
+            "found",
+            "expansion_specs",
+            "x_features",
+            "init_confidence",
+            "x_adv_features",
+            "adv_confidence",
+            "bench_cost",
+            "path_cost",
+            "path",
+            "nodes_expanded",
+            "runtime",
+        ]
+    )
 
     for i, idx in enumerate(tqdm(idxs, ascii=True)):
         logger.debug(
@@ -262,7 +266,8 @@ def _dataset_find_adversarial_examples(
 
         # - Expansion functions used.
         expansion_specs_repr = [
-            (s.feature_name, s.idxs, s.expand_fn.__name__) for s in problem_ctx.expansion_specs
+            (s.feature_name, s.idxs, s.expand_fn.__name__)
+            for s in problem_ctx.expansion_specs
         ]
 
         # - Runtime statistics.
@@ -284,11 +289,10 @@ def _dataset_find_adversarial_examples(
                 temp_x_adv.src[transformable_feature_idxs] = wrapped_x_adv.src
                 wrapped_x_adv = temp_x_adv
 
-
             # Confidence on an adversarial examples.
-            adv_confidence = orig_problem_ctx.clf.predict_proba([wrapped_x_adv.features])[
-                0, orig_problem_ctx.target_class
-            ]
+            adv_confidence = orig_problem_ctx.clf.predict_proba(
+                [wrapped_x_adv.features]
+            )[0, orig_problem_ctx.target_class]
             # Benchmark cost.
             bench_cost = graph_search_problem.bench_cost_fn(
                 get_node_fn(orig_example), wrapped_x_adv
@@ -369,7 +373,8 @@ def run_experiment(
     # Indices of examples in the original class that are within a margin.
     preds = problem_ctx.clf.predict_proba(X)[:, problem_ctx.target_class]
     idxs, = np.where(
-        (preds < problem_ctx.target_confidence) & (preds >= (problem_ctx.target_confidence - confidence_margin))
+        (preds < problem_ctx.target_confidence)
+        & (preds >= (problem_ctx.target_confidence - confidence_margin))
     )
 
     # Perform adversarial example graph search.

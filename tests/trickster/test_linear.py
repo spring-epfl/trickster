@@ -31,19 +31,16 @@ class FakeModel:
     def predict_proba(self, x):
         x = check_array(x)
         p = np.expand_dims(sp.special.expit(self.decision_function(x)), -1)
-        return np.hstack([1-p, p])
+        return np.hstack([1 - p, p])
 
     def grad(self, x, target_class=None):
         return target_class * np.array([2, -1])
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def problem_ctx():
     ctx = CategoricalLpProblemContext(
-        clf=FakeModel(),
-        target_class=1,
-        target_confidence=0.5,
-        lp_space=1
+        clf=FakeModel(), target_class=1, target_confidence=0.5, lp_space=1
     )
     return ctx
 

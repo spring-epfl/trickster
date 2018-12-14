@@ -17,6 +17,7 @@ class LpSpace:
     True
 
     """
+
     def __init__(self, p):
         if isinstance(p, LpSpace):
             other_space = p

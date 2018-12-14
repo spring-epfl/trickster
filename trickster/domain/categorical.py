@@ -237,7 +237,9 @@ class Node:
         for child in expand(self.src, expansion_specs):
             children.append(
                 self.__class__(
-                    src=child, depth=self.depth + 1, feature_extract_fn=self.feature_extract_fn
+                    src=child,
+                    depth=self.depth + 1,
+                    feature_extract_fn=self.feature_extract_fn,
                 )
             )
 

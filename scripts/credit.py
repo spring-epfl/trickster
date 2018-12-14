@@ -178,9 +178,10 @@ if __name__ == "__main__":
 
             logger.info("Running the attack...")
             result = run_experiment(
-                data=(X_test, y_test), problem_ctx=problem_ctx,
+                data=(X_test, y_test),
+                problem_ctx=problem_ctx,
                 transformable_feature_idxs=transformable_feature_idxs,
-                logger=logger
+                logger=logger,
             )
 
             result["bins"] = bins
