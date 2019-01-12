@@ -16,3 +16,4 @@ venv
 *.pkl
 
 .DS_Store
+.vscode
