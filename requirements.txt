@@ -59,8 +59,11 @@ parso==0.2.1
 pbr==4.2.0
 pexpect==4.6.0
 pickleshare==0.7.4
+pipdeptree==0.13.1
+pkg-resources==0.0.0
 pluggy==0.6.0
 profiled==0.1.0
+prometheus-client==0.5.0
 prompt-toolkit==1.0.15
 ptyprocess==0.6.0
 py==1.5.3
@@ -71,7 +74,7 @@ pyparsing==2.2.0
 pytest==3.6.2
 python-dateutil==2.7.3
 pytz==2018.5
-PyYAML==3.13
+PyYAML==4.2b4
 pyzmq==17.0.0
 qtconsole==4.3.1
 requests==2.20.1
