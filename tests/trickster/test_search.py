@@ -1,6 +1,6 @@
 import pytest
 
-from trickster.search import a_star_search, ida_star_search
+from trickster.search import a_star_search, ida_star_search, generalized_a_star_search
 from trickster.utils.romania import *
 
 
@@ -73,3 +73,21 @@ def test_optimal_search_costs(search_fn, target_node, hash_fn):
     for node, cost in path_costs.items():
         if node in optimal_path:
             assert cost == OPTIMAL_COSTS_FROM_ARAD[node]
+
+
+@pytest.mark.parametrize("beam_size,expected", [(1, False), (2, False), (5, True)])
+def test_beam_search(beam_size, expected):
+    # Hill climbing and beam search with beam under 5 don't find the path
+    # to Fagaras.
+    start_node = "Arad"
+    goal_fn = lambda x: x == "Fagaras"
+
+    goal, _, path = generalized_a_star_search(
+        start_node=start_node,
+        expand_fn=expand_fn,
+        goal_fn=goal_fn,
+        beam_size=beam_size,
+        return_path=True,
+    )
+
+    assert goal is None if not expected else goal is not None

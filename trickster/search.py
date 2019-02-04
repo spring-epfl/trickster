@@ -1,4 +1,4 @@
-from boltons.queueutils import PriorityQueue
+import depq
 
 
 def _get_optimal_path(predecessors, start_node, node, hash_fn):
@@ -16,17 +16,18 @@ def _get_optimal_path(predecessors, start_node, node, hash_fn):
     return path
 
 
-def a_star_search(
+def generalized_a_star_search(
     start_node,
     expand_fn,
     goal_fn,
     heuristic_fn=None,
     hash_fn=None,
     iter_lim=None,
+    beam_size=None,
     return_path=False,
 ):
     """
-    A* search.
+    Generalized A* search.
 
     Returns the tuple (cost, target_node) if return_path is set to False.
     Otherwise, returns the target node, the costs of nodes expanded by the
@@ -40,6 +41,7 @@ def a_star_search(
     :param hash_fn: Hash function for nodes. By default equals the
             identity function f(x) = x.
     :param iter_lim: Maximum number of iterations to try.
+    :param beam_size: Beam size. Turns the search into beam search.
     :param return_path: Whether to return the optimal path from the
             initial node to the target node. By default equals False.
     """
@@ -56,14 +58,14 @@ def a_star_search(
     path_costs = {}
     predecessors = {}
     reverse_hashes = {}
-    open_set = PriorityQueue()
+    open_set = depq.DEPQ(maxlen=beam_size)
     closed_set = set()
 
     # Add the starting node; f-score equal to heuristic.
     hashed_start = hash_fn(start_node)
     path_costs[hashed_start] = 0
     f_score = heuristic_fn(start_node)
-    open_set.add(hashed_start, priority=-f_score)
+    open_set.insert(hashed_start, priority=-f_score)
     reverse_hashes[hashed_start] = start_node
 
     # Iterate until a goal node is found, open set is empty
@@ -71,7 +73,7 @@ def a_star_search(
     while len(open_set) and (iter_lim is None or iter_count < iter_lim):
 
         # Retrieve the node with the lowest f-score.
-        hashed_node = open_set.pop()
+        hashed_node, _ = open_set.popfirst()
         node = reverse_hashes[hashed_node]
 
         # Check if the current node is a goal node.
@@ -105,7 +107,7 @@ def a_star_search(
             # to open set.
             path_costs[hashed_neighbour] = tentative_cost
             f_score = tentative_cost + heuristic_fn(neighbour)
-            open_set.add(hashed_neighbour, priority=-f_score)
+            open_set.insert(hashed_neighbour, priority=-f_score)
             reverse_hashes[hashed_neighbour] = neighbour
             if return_path:
                 predecessors[hashed_neighbour] = node
@@ -117,6 +119,34 @@ def a_star_search(
         return None, path_costs, None
     else:
         return None, None
+
+
+def a_star_search(
+    start_node,
+    expand_fn,
+    goal_fn,
+    heuristic_fn=None,
+    hash_fn=None,
+    iter_lim=None,
+    beam_size=None,
+    return_path=False,
+):
+    """
+    Generalized A* search with no beam size limit.
+
+    See :py:func:`generalized_a_star_search`.
+    """
+
+    return generalized_a_star_search(
+        start_node=start_node,
+        expand_fn=expand_fn,
+        goal_fn=goal_fn,
+        heuristic_fn=heuristic_fn,
+        hash_fn=hash_fn,
+        iter_lim=iter_lim,
+        return_path=return_path,
+        beam_size=None,
+    )
 
 
 def _bounded_search_recursive(

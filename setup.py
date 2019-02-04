@@ -11,7 +11,7 @@ INSTALL_REQUIRES = [
     "scikit-learn",
     "attrs",
     "tqdm",
-    "boltons",
+    "depq",
     "profiled",
     "pandas",
 ]
