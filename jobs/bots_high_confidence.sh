@@ -13,5 +13,5 @@ scripts/bots.py \
     --popularity_band 1k \
     --confidence_level 0.75 \
     --no_reduce_classifier \
-    --output_pickle "out/reports/bots_band_1k_target_0.75_more.pkl"
+    --output_pickle "out/reports/bots_band_1k_target_0.75.pkl"
 
