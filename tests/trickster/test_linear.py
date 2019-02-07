@@ -34,7 +34,10 @@ class FakeModel:
         return np.hstack([1 - p, p])
 
     def grad(self, x, target_class=None):
-        return target_class * np.array([2, -1])
+        result = np.array([2, -1])
+        if target_class == 0:
+            result *= -1
+        return result
 
 
 @pytest.fixture(scope="function")
@@ -55,13 +58,28 @@ def test_heuristic_source_side(problem_ctx):
 
     # f([0, 6]) = -3, ||grad(f)|| = ||[2, -1]|| = 2  (inf-norm)
     # h = |-3| / 2 = 1.5
-    assert h([0, 6]) == 1.5
+    assert pytest.approx(h([0, 6]), 1.5)
 
 
-def test_heuristic_custom_target(problem_ctx):
+@pytest.mark.parametrize("target_class", [0, 1])
+def test_heuristic_custom_target(problem_ctx, target_class):
+    problem_ctx.target_class = target_class
     problem_ctx.target_confidence = 0.95
 
     h = LinearHeuristic(problem_ctx)
 
-    # Further away from the boundary than with 0.5 threshold
-    assert h([0, 6]) > 2.9
+    # 2.9445 = logit(0.95)
+    # f95([0, 6]) = -3 - 2.9445 = -5.945
+    # h = |-5.945| / 2 = 2.972
+    if target_class == 1:
+        # Almost twice as far from the boundary with 0.5 threshold
+        assert h([0, 6]) == pytest.approx(2.9722194895832197)
+
+    else:
+        # Just behind the 0.95 threshold boundary for class 0.
+        assert h([0, 6]) == pytest.approx(0)
+
+        # This is right at 0.5 threshold.
+        # f95([0, 3]) = -2.9445
+        # h = |-2.9445| / 2 = 1.47
+        assert h([0, 3]) == pytest.approx(1.4722194895832197)

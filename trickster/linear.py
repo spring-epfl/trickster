@@ -73,9 +73,9 @@ def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
 
 @attr.s
 class LinearHeuristic:
-    r"""$$L_p$$ distance to the decision boundary of a linear or linearized classifier.
+    r"""$$L_p$$ distance to the decision boundary of a binary linear or linearized classifier.
 
-    :param trickster.lp.LpProblemCtx problem_ctx: Problem context.
+    :param problem_ctx: Problem context.
     """
 
     problem_ctx = attr.ib()
@@ -83,14 +83,22 @@ class LinearHeuristic:
     @profiled
     def __call__(self, x):
         ctx = self.problem_ctx
+        if ctx.epsilon == 0.0:
+            return 0.0
+
         confidence = ctx.clf.predict_proba([x])[0, ctx.target_class]
         if confidence >= ctx.target_confidence:
             return 0.0
 
         score = ctx.clf.decision_function([x])[0]
-        if ctx.target_confidence != 0.5:
-            score -= sp.special.logit(ctx.target_confidence)
 
+        # If target confidence is not 0.5, correct the score.
+        if ctx.target_confidence != 0.5:
+            delta = sp.special.logit(ctx.target_confidence)
+            delta *= -1 if ctx.target_class == 1 else 1
+            score += delta
+
+        # Compute the distance to the boundary.
         fgrad = get_forward_grad(ctx.clf, x, target_class=ctx.target_class)
         h = np.abs(score) / np.linalg.norm(fgrad, ord=ctx.lp_space.q)
         return h * ctx.epsilon
