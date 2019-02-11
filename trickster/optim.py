@@ -22,7 +22,7 @@ from profiled import Profiler, profiled
 
 from trickster import linear
 from trickster.search import a_star_search
-from trickster.base import ProblemContext, GraphSearchProblem
+from trickster.base import ProblemContext, GraphSearchProblem, WithProblemContext
 from trickster.domain.categorical import FeatureExpansionSpec
 from trickster.domain.categorical import Node
 from trickster.utils.lp import LpSpace
@@ -49,7 +49,6 @@ class CategoricalLpProblemContext(ProblemContext):
     ...     clf="stub", target_class=1, target_confidence=0.5,
     ...     lp_space="inf", epsilon=10)
 
-
     """
 
     clf: typing.Any
@@ -61,13 +60,13 @@ class CategoricalLpProblemContext(ProblemContext):
 
     def get_graph_search_problem(self):
         problem_ctx = self
-        expand_fn = _ExpandFunc(problem_ctx=problem_ctx)
-        goal_fn = _GoalFunc(problem_ctx=problem_ctx)
+        expand_fn = SpecExpandFunc(problem_ctx=problem_ctx)
+        goal_fn = GoalFunc(problem_ctx=problem_ctx)
 
         raw_heuristic = linear.LinearHeuristic(problem_ctx=problem_ctx)
         heuristic_fn = lambda x: raw_heuristic(x.features)
 
-        bench_cost_fn = _BenchCost(problem_ctx=problem_ctx)
+        bench_cost_fn = BenchCost(problem_ctx=problem_ctx)
         hash_fn = _default_hash_fn
 
         return GraphSearchProblem(
@@ -80,13 +79,10 @@ class CategoricalLpProblemContext(ProblemContext):
         )
 
 
-@attr.s
-class _ExpandFunc:
+class SpecExpandFunc(WithProblemContext):
     """
     Expand candidates using given specs with each transformation having $L_p$ cost.
     """
-
-    problem_ctx = attr.ib()
 
     @profiled
     def __call__(self, x):
@@ -99,11 +95,8 @@ class _ExpandFunc:
         return list(zip(children, costs))
 
 
-@attr.s
-class _GoalFunc:
+class GoalFunc(WithProblemContext):
     """Tells whether an example flips the decision of the classifier."""
-
-    problem_ctx = attr.ib()
 
     @profiled
     def __call__(self, x):
@@ -115,8 +108,7 @@ class _GoalFunc:
         )
 
 
-@attr.s
-class _BenchCost:
+class BenchCost(WithProblemContext):
     """Alternative cost function used for analyses and stats."""
 
     problem_ctx = attr.ib()
@@ -124,7 +116,7 @@ class _BenchCost:
     @profiled
     def __call__(self, x, another):
         return np.linalg.norm(
-            x.features - another.features, ord=self.problem_ctx.lp_space.q
+            x.features - another.features, ord=self.problem_ctx.lp_space.p
         )
 
 

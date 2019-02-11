@@ -27,9 +27,19 @@ class GraphSearchProblem:
 
 @attr.s
 class ProblemContext(metaclass=abc.ABCMeta):
+    """
+    A high-level definition of the adversarial search problem.
+    """
+
     clf = attr.ib()
     target_class = attr.ib()
 
     @abc.abstractmethod
     def get_graph_search_problem(self):
+        """Generate an instance of graph search problem."""
         pass
+
+
+@attr.s()
+class WithProblemContext:
+    problem_ctx = attr.ib()

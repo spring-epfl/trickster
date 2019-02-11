@@ -9,6 +9,8 @@ from profiled import profiled
 
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 
+from trickster.base import WithProblemContext
+
 
 def _get_forward_grad_lr(clf, x, target_class=None):
     return clf.coef_[0]
@@ -71,14 +73,11 @@ def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
     return clf_reduced
 
 
-@attr.s
-class LinearHeuristic:
-    r"""$$L_p$$ distance to the decision boundary of a binary linear or linearized classifier.
+class LinearHeuristic(WithProblemContext):
+    r"""$$L_p$$ distance to the decision boundary of a binary linear classifier.
 
     :param problem_ctx: Problem context.
     """
-
-    problem_ctx = attr.ib()
 
     @profiled
     def __call__(self, x):
@@ -102,3 +101,20 @@ class LinearHeuristic:
         fgrad = get_forward_grad(ctx.clf, x, target_class=ctx.target_class)
         h = np.abs(score) / np.linalg.norm(fgrad, ord=ctx.lp_space.q)
         return h * ctx.epsilon
+
+
+@attr.s
+class LinearGridHeuristic(LinearHeuristic):
+    """Snaps values of a linear heuristic to values on a regular grid.
+
+    This is useful when the transformations in the transformation graph
+    have fixed costs.
+    """
+
+    grid_step = attr.ib()
+
+    @profiled
+    def __call__(self, x):
+        h = super().__call__(x)
+        snapped = np.ceil(h / self.grid_step) * self.grid_step
+        return snapped

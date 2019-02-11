@@ -6,7 +6,7 @@ import scipy as sp
 from sklearn.utils import check_array
 
 from trickster.optim import CategoricalLpProblemContext
-from trickster.linear import LinearHeuristic
+from trickster.linear import LinearHeuristic, LinearGridHeuristic
 
 
 class FakeModel:
@@ -58,7 +58,7 @@ def test_heuristic_source_side(problem_ctx):
 
     # f([0, 6]) = -3, ||grad(f)|| = ||[2, -1]|| = 2  (inf-norm)
     # h = |-3| / 2 = 1.5
-    assert pytest.approx(h([0, 6]), 1.5)
+    assert h([0, 6]) == pytest.approx(1.5)
 
 
 @pytest.mark.parametrize("target_class", [0, 1])
@@ -83,3 +83,13 @@ def test_heuristic_custom_target(problem_ctx, target_class):
         # f95([0, 3]) = -2.9445
         # h = |-2.9445| / 2 = 1.47
         assert h([0, 3]) == pytest.approx(1.4722194895832197)
+
+
+def test_grid_heuristic(problem_ctx):
+    h = LinearGridHeuristic(problem_ctx, grid_step=1)
+    assert h([1, 0]) == 0
+    assert h([0, 6]) == 2  # 1.5
+
+    h = LinearGridHeuristic(problem_ctx, grid_step=0.2)
+    assert h([1, 0]) == 0
+    assert h([0, 6]) == 1.6  # 1.5
