@@ -15,13 +15,16 @@ import pickle
 import ast
 import pprint
 import click
+import random
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import train_test_split
 
 from trickster.optim import run_experiment
+from trickster.optim import SpecExpandFunc
 from trickster.optim import CategoricalLpProblemContext
+from trickster.linear import LinearGridHeuristic
 from trickster.utils.log import setup_custom_logger
-from trickster.search import a_star_search, ida_star_search
+from trickster.search import a_star_search
 from trickster.domain.categorical import *
 
 
@@ -228,6 +231,39 @@ def get_expansions_specs(features=None):
     return expansions, transformable_feature_idxs
 
 
+class NoCostExpandFunc(SpecExpandFunc):
+    """Expand function that drops the costs."""
+
+    def __call__(self, *args, **kwargs):
+        neighbours = super().__call__(*args, **kwargs)
+        return [(n, 0) for (n, c) in neighbours]
+
+
+@attr.s
+class RandomHeuristicProblemContext(CategoricalLpProblemContext):
+    seed = attr.ib(default=1)
+
+    def get_graph_search_problem(self):
+        graph_search_problem = super().get_graph_search_problem()
+
+        graph_search_problem.expand_fn = NoCostExpandFunc(problem_ctx=self)
+        graph_search_problem.heuristic_fn = lambda x: random.random()
+        return graph_search_problem
+
+
+@attr.s
+class GridHeuristicProblemContext(CategoricalLpProblemContext):
+    def get_graph_search_problem(self):
+        graph_search_problem = super().get_graph_search_problem()
+
+        # [1, 1] is a unit difference vector for this transformation graph.
+        grid_step = np.linalg.norm([1, 1], ord=self.lp_space.p)
+
+        raw_heuristic = LinearGridHeuristic(problem_ctx=self, grid_step=grid_step)
+        graph_search_problem.heuristic_fn = lambda x: raw_heuristic(x.features)
+        return graph_search_problem
+
+
 @click.command()
 @click.argument("epsilons", nargs=-1, required=True, type=float)
 @click.option(
@@ -267,6 +303,18 @@ def get_expansions_specs(features=None):
     help="Whether to use classifier reduction optimization.",
 )
 @click.option(
+    "--heuristic",
+    default="dist",
+    type=click.Choice(["dist", "dist_grid", "random"]),
+    help="Heuristic",
+)
+@click.option(
+    "--heuristic_seed",
+    default="1",
+    type=int,
+    help="If using random heuristic, its seed.",
+)
+@click.option(
     "--p_norm",
     default="1",
     type=click.Choice(["1", "2", "inf"]),
@@ -302,6 +350,8 @@ def generate(
     bot_dataset_template,
     reduce_classifier,
     p_norm,
+    heuristic,
+    heuristic_seed,
     confidence_level,
     output_pickle,
     iter_lim,
@@ -358,7 +408,7 @@ def generate(
                 feature_names
             )
 
-            problem_ctx = CategoricalLpProblemContext(
+            problem_ctx_params = dict(
                 clf=clf,
                 target_class=0,
                 target_confidence=confidence_level,
@@ -366,6 +416,16 @@ def generate(
                 expansion_specs=expansion_specs,
                 epsilon=epsilon,
             )
+            if heuristic == "dist":
+                problem_ctx = CategoricalLpProblemContext(**problem_ctx_params)
+
+            elif heuristic == "dist_grid":
+                problem_ctx = GridHeuristicProblemContext(**problem_ctx_params)
+
+            elif heuristic == "random":
+                problem_ctx = RandomHeuristicProblemContext(
+                    seed=heuristic_seed, **problem_ctx_params
+                )
 
             logger.info("Running the attack...")
             result = run_experiment(

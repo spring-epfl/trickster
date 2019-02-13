@@ -37,13 +37,14 @@ def invoke_bots_script(*args, **kwargs):
         log_file = f.name
         cmd = build_cmd(BOTS_SCRIPT, *args, log_file=log_file, **kwargs)
         print(cmd)
-        subprocess.run(cmd, shell=True, check=True, stderr=subprocess.PIPE)
+        subprocess.run(cmd, shell=True, check=True, stderr=subprocess.STDOUT)
 
         f.seek(0)
         return f.read()
 
 
-def test_generation(file_factory):
+@pytest.mark.parametrize("heuristic", ["dist", "dist_grid", "random"])
+def test_generation(file_factory, heuristic):
     with file_factory() as results_file:
         log = invoke_bots_script(
             "100",
@@ -52,6 +53,7 @@ def test_generation(file_factory):
             bins=20,
             confidence_level=0.5,
             iter_lim=2,
+            heuristic=heuristic,
         )
 
         assert "found" in log
@@ -60,3 +62,4 @@ def test_generation(file_factory):
     # One example is expected to be found.
     assert len(results[0]["search_results"].found) > 0
     assert len(results[0]["search_results"]) == 41
+
