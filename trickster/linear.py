@@ -118,3 +118,4 @@ class LinearGridHeuristic(LinearHeuristic):
         h = super().__call__(x)
         snapped = np.ceil(h / self.grid_step) * self.grid_step
         return snapped
+
