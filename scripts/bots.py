@@ -337,6 +337,12 @@ class GridHeuristicProblemContext(CategoricalLpProblemContext):
     help="The p parameter of the Lp norm for computing the cost.",
 )
 @click.option(
+    "--beam_size",
+    default=None,
+    type=int,
+    help="Size of the A* fringe.",
+)
+@click.option(
     "--confidence_level",
     default=0.5,
     show_default=True,
@@ -366,6 +372,7 @@ def generate(
     bot_dataset_template,
     reduce_classifier,
     p_norm,
+    beam_size,
     classifier,
     heuristic,
     heuristic_seed,
@@ -452,7 +459,7 @@ def generate(
             result = run_experiment(
                 data=(X_test, y_test),
                 problem_ctx=problem_ctx,
-                graph_search_kwargs=dict(iter_lim=iter_lim),
+                graph_search_kwargs=dict(iter_lim=iter_lim, beam_size=beam_size),
                 reduce_classifier=reduce_classifier,
                 transformable_feature_idxs=transformable_feature_idxs,
                 logger=logger,

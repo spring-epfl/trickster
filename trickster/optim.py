@@ -21,7 +21,7 @@ from collections import Counter as CollectionsCounter
 from profiled import Profiler, profiled
 
 from trickster import linear
-from trickster.search import a_star_search
+from trickster.search import generalized_a_star_search
 from trickster.base import ProblemContext, GraphSearchProblem, WithProblemContext
 from trickster.domain.categorical import FeatureExpansionSpec
 from trickster.domain.categorical import Node
@@ -70,7 +70,7 @@ class CategoricalLpProblemContext(ProblemContext):
         hash_fn = _default_hash_fn
 
         return GraphSearchProblem(
-            search_fn=a_star_search,
+            search_fn=generalized_a_star_search,
             expand_fn=expand_fn,
             heuristic_fn=heuristic_fn,
             goal_fn=goal_fn,
