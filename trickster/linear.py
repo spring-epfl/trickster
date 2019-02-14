@@ -8,12 +8,26 @@ import scipy as sp
 from profiled import profiled
 
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
+from sklearn.svm import SVC
 
 from trickster.base import WithProblemContext
 
 
 def _get_forward_grad_lr(clf, x, target_class=None):
     return clf.coef_[0]
+
+
+def _get_forward_grad_svm_rbf(clf, x, target_class=None):
+    kernel_grads = []
+    for sv in clf.support_vectors_:
+        kernel_grads.append(
+            2
+            * clf.gamma
+            * (x - sv)
+            * np.exp(-clf.gamma * np.linalg.norm(x - sv, ord=2)**2)
+        )
+
+    return np.dot(clf.dual_coef_[0], np.array(kernel_grads))
 
 
 def _get_forward_grad_default(clf, x, target_class=None):
@@ -25,11 +39,13 @@ def get_forward_grad(clf, x, target_class=None):
 
     :param clf: Classifier.
     :param x: Input.
-    :param target_class: Not supported.
+    :param target_class: Currently not supported.
     """
-
     if isinstance(clf, LogisticRegressionCV) or isinstance(clf, LogisticRegression):
         return _get_forward_grad_lr(clf, x, target_class)
+
+    elif isinstance(clf, SVC) and clf.kernel == 'rbf':
+        return _get_forward_grad_svm_rbf(clf, x, target_class)
 
     else:
         return _get_forward_grad_default(clf, x, target_class)
@@ -52,6 +68,9 @@ def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
     :param transformable_feature_idxs: List of features that can be changed in the given example.
     """
 
+    if not isinstance(clf, LogisticRegressionCV) or not isinstance(clf, LogisticRegression):
+        raise ValueError("Only logistic regression classifiers can be reduced.")
+
     # Establish non-transformable feature indexes.
     feature_idxs = np.arange(x.size)
     non_transformable_feature_idxs = np.setdiff1d(
@@ -73,6 +92,28 @@ def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
     return clf_reduced
 
 
+def dist_to_decision_boundary(clf, x, target_class, target_confidence, lp_space):
+    """
+    Compute distance to the decision boundary of a binary linear classifier.
+    """
+    confidence = clf.predict_proba([x])[0, target_class]
+    if confidence >= target_confidence:
+        return 0.0
+
+    score = clf.decision_function([x])[0]
+
+    # If target confidence is not 0.5, correct the score.
+    if target_confidence != 0.5:
+        delta = sp.special.logit(target_confidence)
+        delta *= -1 if target_class == 1 else 1
+        score += delta
+
+    # Compute the distance to the boundary.
+    fgrad = get_forward_grad(clf, x, target_class=target_class)
+    result = np.abs(score) / np.linalg.norm(fgrad, ord=lp_space.q)
+    return result
+
+
 class LinearHeuristic(WithProblemContext):
     r"""$$L_p$$ distance to the decision boundary of a binary linear classifier.
 
@@ -85,21 +126,13 @@ class LinearHeuristic(WithProblemContext):
         if ctx.epsilon == 0.0:
             return 0.0
 
-        confidence = ctx.clf.predict_proba([x])[0, ctx.target_class]
-        if confidence >= ctx.target_confidence:
-            return 0.0
-
-        score = ctx.clf.decision_function([x])[0]
-
-        # If target confidence is not 0.5, correct the score.
-        if ctx.target_confidence != 0.5:
-            delta = sp.special.logit(ctx.target_confidence)
-            delta *= -1 if ctx.target_class == 1 else 1
-            score += delta
-
-        # Compute the distance to the boundary.
-        fgrad = get_forward_grad(ctx.clf, x, target_class=ctx.target_class)
-        h = np.abs(score) / np.linalg.norm(fgrad, ord=ctx.lp_space.q)
+        h = dist_to_decision_boundary(
+            clf=ctx.clf,
+            target_class=ctx.target_class,
+            target_confidence=ctx.target_confidence,
+            lp_space=ctx.lp_space,
+            x=x
+        )
         return h * ctx.epsilon
 
 
@@ -109,6 +142,9 @@ class LinearGridHeuristic(LinearHeuristic):
 
     This is useful when the transformations in the transformation graph
     have fixed costs.
+
+    :param problem_ctx: Problem context.
+    :param grid_step: Regular grid step.
     """
 
     grid_step = attr.ib()
