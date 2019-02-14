@@ -380,6 +380,7 @@ def run_experiment(
         data=X,
         idxs=idxs,
         problem_ctx=problem_ctx,
+        reduce_classifier=reduce_classifier,
         graph_search_kwargs=graph_search_kwargs,
         transformable_feature_idxs=transformable_feature_idxs,
     )

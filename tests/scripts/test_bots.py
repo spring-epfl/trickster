@@ -22,7 +22,10 @@ def build_cmd(*args, **kwargs):
     options = []
     for key, value in kwargs.items():
         if isinstance(value, bool):
-            options.append("--%s" % key)
+            if value:
+                options.append("--%s" % key)
+            else:
+                options.append("--no_%s" % key)
         elif isinstance(value, int) or isinstance(value, float):
             options.append("--%s %s" % (key, value))
         else:
@@ -44,8 +47,14 @@ def invoke_bots_script(*args, **kwargs):
 
 
 @pytest.mark.parametrize("heuristic", ["dist", "dist_grid", "random"])
-def test_generation(file_factory, heuristic):
+@pytest.mark.parametrize("classifier", ["lr", "svmrbf"])
+def test_generation(file_factory, heuristic, classifier):
     with file_factory() as results_file:
+        if classifier == "svmrbf":
+            reduce_classifier = False
+        else:
+            reduce_classifier = True
+
         log = invoke_bots_script(
             "100",
             output_pickle=results_file.name,
@@ -54,6 +63,8 @@ def test_generation(file_factory, heuristic):
             confidence_level=0.5,
             iter_lim=2,
             heuristic=heuristic,
+            classifier=classifier,
+            reduce_classifier=reduce_classifier
         )
 
         assert "found" in log
@@ -61,5 +72,6 @@ def test_generation(file_factory, heuristic):
 
     # One example is expected to be found.
     assert len(results[0]["search_results"].found) > 0
-    assert len(results[0]["search_results"]) == 41
+    # 41 examples for LR and 42 examples for SVM.
+    assert len(results[0]["search_results"]) >= 41
 

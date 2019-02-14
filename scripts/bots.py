@@ -16,6 +16,7 @@ import ast
 import pprint
 import click
 import random
+from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import train_test_split
 
@@ -127,7 +128,7 @@ def load_transform_data(human_dataset, bot_dataset, drop_features, bins, **kwarg
     return X, y, df_X.columns
 
 
-def fit_clf(X_train, y_train, seed=1):
+def fit_lr(X_train, y_train, seed=1):
     """
     Fit logistic regression by performing a Grid Search with Cross Validation.
     """
@@ -145,6 +146,15 @@ def fit_clf(X_train, y_train, seed=1):
         random_state=seed,
     )
 
+    clf.fit(X_train, y_train)
+    return clf
+
+
+def fit_svmrbf(X_train, y_train, seed=1):
+    """
+    Fit an SVM-RBF with pre-selected hyperparameters.
+    """
+    clf = SVC(C=10, gamma=0.01, kernel='rbf', probability=True, random_state=seed)
     clf.fit(X_train, y_train)
     return clf
 
@@ -303,6 +313,12 @@ class GridHeuristicProblemContext(CategoricalLpProblemContext):
     help="Whether to use classifier reduction optimization.",
 )
 @click.option(
+    "--classifier",
+    default="lr",
+    type=click.Choice(["lr", "svmrbf"]),
+    help="Target classifier",
+)
+@click.option(
     "--heuristic",
     default="dist",
     type=click.Choice(["dist", "dist_grid", "random"]),
@@ -350,6 +366,7 @@ def generate(
     bot_dataset_template,
     reduce_classifier,
     p_norm,
+    classifier,
     heuristic,
     heuristic_seed,
     confidence_level,
@@ -403,7 +420,11 @@ def generate(
             )
 
             logger.info("Fitting a model.")
-            clf = fit_clf(X_train, y_train, seed=seed)
+            if classifier == 'lr':
+                clf = fit_lr(X_train, y_train, seed=seed)
+            elif classifier == 'svmrbf':
+                clf = fit_svmrbf(X_train, y_train, seed=seed)
+
             expansion_specs, transformable_feature_idxs = get_expansions_specs(
                 feature_names
             )
