@@ -2,6 +2,8 @@
 
 NPROC=${NPROC:=4}
 
+CONFIDENCE_LEVEL=50
+
 # Should be separated by commas. Choices of bands: "'1k', '100k', '1M', '10M'"
 BANDS="'1k', '100k', '1M', '10M'"
 
@@ -13,20 +15,20 @@ python -c "for band in [$BANDS]: print(band)" | \
     parallel -j $NPROC \
     scripts/bots.py \
         0 \
-        --log_file "log/bots__band_{}__target_50__ucs_only.log" \
+        --log_file "log/bots__band_{}__target_${CONFIDENCE_LEVEL}__ucs_only.log" \
         --popularity_band {} \
-        --confidence_level 0.5 \
-        --output_pickle "out/reports/bots__band_{}__target_50__ucs_only.pkl"
+        --confidence_level 0.${CONFIDENCE_LEVEL} \
+        --output_pickle "out/reports/bots__band_{}__target_${CONFIDENCE_LEVEL}__ucs_only.pkl"
 
 echo "Generating adversarial examples with A*..."
 python -c "for band in [$BANDS]: print(band)" | \
     parallel -j $NPROC \
     scripts/bots.py \
         $EPSILONS \
-        --log_file "log/bots__band_{}__target_50.log" \
+        --log_file "log/bots__band_{}__target_${CONFIDENCE_LEVEL}.log" \
         --popularity_band {} \
-        --confidence_level 0.5 \
-        --output_pickle "out/reports/bots__band_{}__target_50.temp.pkl"
+        --confidence_level 0.${CONFIDENCE_LEVEL} \
+        --output_pickle "out/reports/bots__band_{}__target_${CONFIDENCE_LEVEL}.temp.pkl"
 
 # Adding the UCS results to the A* results.
 python -c "for band in [$BANDS]: print(band)" | \
