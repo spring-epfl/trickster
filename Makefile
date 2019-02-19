@@ -1,7 +1,16 @@
 TEMP_DIR=.tmp
 
 .PHONY: data
-data: twitter_bots
+data: knndata twitter_bots
+
+.PHONY: knndata
+knndata: ${TEMP_DIR}/knndata.zip
+	mkdir data/wfp
+	unzip ${TEMP_DIR}/knndata.zip -d data/wfp
+
+${TEMP_DIR}/knndata.zip:
+	mkdir -p ${TEMP_DIR}
+	curl https://www.cse.ust.hk/~taow/wf/data/knndata.zip > ${TEMP_DIR}/knndata.zip
 
 .PHONY: twitter_bots
 twitter_bots: ${TEMP_DIR}/twitter_bots.zip

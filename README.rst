@@ -80,6 +80,7 @@ The datasets include:
 
 - UCI `German credit dataset <https://archive.ics.uci.edu/ml/datasets/statlog+(german+credit+data)>`__
 - Zafar Gilani's `Twitter bot classification dataset <https://www.cl.cam.ac.uk/~szuhg2/data.html>`__
+- Tao Wang's `knndata <http://home.cse.ust.hk/~taow/wf/data/>`__
 
 .. end-exp-setup-marker-do-not-remove
 
