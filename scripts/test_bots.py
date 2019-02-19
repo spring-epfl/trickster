@@ -8,10 +8,9 @@ import pytest
 import pandas as pd
 
 
-BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../..")
+BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
 BOTS_SCRIPT = os.path.join(BASE_DIR, "scripts/bots.py")
-
-MAX_TRACES = 50
+DATA_PATH = os.path.join(BASE_DIR, "data/twitter_bots")
 
 
 def build_cmd(*args, **kwargs):
@@ -64,7 +63,9 @@ def test_generation(file_factory, heuristic, classifier):
             iter_lim=2,
             heuristic=heuristic,
             classifier=classifier,
-            reduce_classifier=reduce_classifier
+            reduce_classifier=reduce_classifier,
+            human_dataset_template=DATA_PATH + "/humans/humans.{}.csv",
+            bot_dataset_template=DATA_PATH + "/bots/bots.{}.csv",
         )
 
         assert "found" in log
