@@ -104,7 +104,7 @@ class GoalFunc(WithProblemContext):
             self.problem_ctx.clf.predict_proba([x.features])[
                 0, self.problem_ctx.target_class
             ]
-            >= self.problem_ctx.target_confidence
+            > self.problem_ctx.target_confidence
         )
 
 

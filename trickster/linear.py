@@ -5,9 +5,11 @@ Tools for working with linear and linearized models.
 import attr
 import numpy as np
 import scipy as sp
+
 from profiled import profiled
 
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
+from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
 
 from trickster.base import WithProblemContext
@@ -41,6 +43,9 @@ def get_forward_grad(clf, x, target_class=None):
     :param x: Input.
     :param target_class: Currently not supported.
     """
+    if isinstance(clf, GridSearchCV):
+        clf = clf.best_estimator_
+
     if isinstance(clf, LogisticRegressionCV) or isinstance(clf, LogisticRegression):
         return _get_forward_grad_lr(clf, x, target_class)
 
@@ -97,7 +102,7 @@ def dist_to_decision_boundary(clf, x, target_class, target_confidence, lp_space)
     Compute distance to the decision boundary of a binary linear classifier.
     """
     confidence = clf.predict_proba([x])[0, target_class]
-    if confidence >= target_confidence:
+    if confidence > target_confidence:
         return 0.0
 
     score = clf.decision_function([x])[0]
