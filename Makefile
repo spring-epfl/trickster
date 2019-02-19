@@ -5,7 +5,7 @@ data: knndata twitter_bots
 
 .PHONY: knndata
 knndata: ${TEMP_DIR}/knndata.zip
-	mkdir data/wfp
+	mkdir -p data/wfp
 	unzip ${TEMP_DIR}/knndata.zip -d data/wfp
 
 ${TEMP_DIR}/knndata.zip:
