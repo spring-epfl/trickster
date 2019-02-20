@@ -5,13 +5,14 @@ import os
 import sys
 import math
 import random
-from numpy import median
-import numpy as np
 from collections import deque
-
 from shutil import copyfile
 
+import click
+import numpy as np
+
 from tqdm import tqdm
+from numpy import median
 
 # Direction
 IN = -1
@@ -447,19 +448,12 @@ def normalise_timings(packets):
     return res
 
 
-if __name__ == "__main__":
-
-    if len(sys.argv) < 2:
-        print("Usage: {} <input folder>".format(sys.argv[1]))
-        sys.exit(1)
-
-    max_trace_len = int(sys.argv[1])
-
-    # Where defended data is put.
-    DEFENDED = "out/wfp/csBUFLO__tracelen_%i" % max_trace_len
-
-    dataset = "data/wfp/batch__tracelen_%i" % max_trace_len
-    max_trace_len = int(sys.argv[1])
+@click.command()
+@click.option("--data_path")
+@click.option("--out_path")
+def main(data_path, out_path):
+    DEFENDED = out_path
+    dataset = data_path
     outdirectory = DEFENDED
 
     if not os.path.exists(outdirectory):
@@ -502,3 +496,7 @@ if __name__ == "__main__":
                 t /= 1000.0  # To seconds
                 s = 1 if s > 0 else -1
                 f.write(repr(t) + "\t" + repr(s) + "\n")
+
+
+if __name__ == "__main__":
+    main()

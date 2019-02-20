@@ -8,6 +8,8 @@ import sys
 import math
 import random
 
+import click
+
 from tqdm import tqdm
 
 
@@ -18,11 +20,8 @@ def fsign(num):
         return 1
 
 
-def defend(list1, list2, parameter):
+def defend(list1, list2, r_in=0.02, r_out=0.02, mintime=42):
     datasize = 1
-    # configure (s)
-    # mintime = int( sys.argv[1] )
-    mintime = 42
 
     buf = [0, 0]
     listind = 0  # marks the next packet to send
@@ -37,7 +36,7 @@ def defend(list1, list2, parameter):
             lastind[0] = i
         else:
             lastind[1] = i
-    defintertime = [[0.06], [0.06]]
+    defintertime = [[r_out], [r_in]]
     while listind < len(list1) or buf[0] + buf[1] > 0 or curtime < starttime + mintime:
         # print "Send packet, buffers", buf[0], buf[1], "listind", listind
         # decide which packet to send
@@ -94,19 +93,15 @@ def defend(list1, list2, parameter):
         count[cursign] += 1
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        exit("Need max trace length parameter")
-
-    max_trace_len = int(sys.argv[1])
-
-    data_path = "data/wfp/batch__tracelen_%i/" % max_trace_len
-    out_path = "out/wfp_defences/BuFLO_006__tracelen_%i/" % max_trace_len
-
+@click.command()
+@click.option("--data_path")
+@click.option("--out_path")
+@click.option("--r_in", default=0.02)
+@click.option("--r_out", default=0.02)
+@click.option("--mintime", default=42)
+def main(data_path, out_path, r_in, r_out, mintime):
     # src pathes to consider
     crawl_src = list()
-    # closed and open world
-    parameters = [0, 1500, 0.02, 10]
 
     s_sitenum = 0
     e_sitenum = 100
@@ -120,10 +115,11 @@ if __name__ == "__main__":
     for j in tqdm(range(s_sitenum, e_sitenum)):
         for i in range(0, instnum):
             packets = []
-            if os.path.isfile(data_path + str(j) + "-" + str(i)):
-                f = open(data_path + str(j) + "-" + str(i), "r")
-                d = open(out_path + str(j) + "-" + str(i), "w")
-                lines = f.readlines()
+            inst_path = os.path.join(data_path, "%i-%i" % (j, i))
+            if os.path.isfile(inst_path):
+                with open(inst_path, "r") as f:
+                    lines = f.readlines()
+
                 if float(lines[-1].split("\t")[0]) > max_time:
                     max_time = float(lines[-1].split("\t")[0])
                 starttime = float(lines[0].split("\t")[0])
@@ -132,10 +128,14 @@ if __name__ == "__main__":
                     packets.append([float(x[0]) - starttime, int(x[1])])
 
                 list2 = []
-                defend(packets, list2, parameters)
+                defend(packets, list2, r_in=r_in, r_out=r_out, mintime=mintime)
                 list2 = sorted(list2, key=lambda list2: list2[0])
-                for x in list2:
-                    d.write(repr(x[0]) + "\t" + repr(x[1]) + "\n")
-                f.close()
-                d.close()
+
+                with open(os.path.join(out_path, "%i-%i" % (j, i)), "w") as d:
+                    for x in list2:
+                        d.write(repr(x[0]) + "\t" + repr(x[1]) + "\n")
+
+
+if __name__ == "__main__":
+    main()
 
