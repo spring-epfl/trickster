@@ -26,7 +26,7 @@ def _get_forward_grad_svm_rbf(clf, x, target_class=None):
             2
             * clf.gamma
             * (x - sv)
-            * np.exp(-clf.gamma * np.linalg.norm(x - sv, ord=2)**2)
+            * np.exp(-clf.gamma * np.linalg.norm(x - sv, ord=2) ** 2)
         )
 
     return np.dot(clf.dual_coef_[0], np.array(kernel_grads))
@@ -49,7 +49,7 @@ def get_forward_grad(clf, x, target_class=None):
     if isinstance(clf, LogisticRegressionCV) or isinstance(clf, LogisticRegression):
         return _get_forward_grad_lr(clf, x, target_class)
 
-    elif isinstance(clf, SVC) and clf.kernel == 'rbf':
+    elif isinstance(clf, SVC) and clf.kernel == "rbf":
         return _get_forward_grad_svm_rbf(clf, x, target_class)
 
     else:
@@ -73,7 +73,9 @@ def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
     :param transformable_feature_idxs: List of features that can be changed in the given example.
     """
 
-    if not isinstance(clf, LogisticRegressionCV) or not isinstance(clf, LogisticRegression):
+    if not isinstance(clf, LogisticRegressionCV) or not isinstance(
+        clf, LogisticRegression
+    ):
         raise ValueError("Only logistic regression classifiers can be reduced.")
 
     # Establish non-transformable feature indexes.
@@ -97,7 +99,9 @@ def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
     return clf_reduced
 
 
-def dist_to_decision_boundary(clf, x, target_class, target_confidence, lp_space):
+def dist_to_decision_boundary(
+    clf, x, target_class, target_confidence, lp_space, _grad_norm=None
+):
     """
     Compute distance to the decision boundary of a binary linear classifier.
     """
@@ -114,16 +118,21 @@ def dist_to_decision_boundary(clf, x, target_class, target_confidence, lp_space)
         score += delta
 
     # Compute the distance to the boundary.
-    fgrad = get_forward_grad(clf, x, target_class=target_class)
-    result = np.abs(score) / np.linalg.norm(fgrad, ord=lp_space.q)
-    return result
+    if _grad_norm is None:
+        fgrad = get_forward_grad(clf, x, target_class=target_class)
+        _grad_norm = np.linalg.norm(fgrad, ord=lp_space.q)
+
+    return np.abs(score) / _grad_norm
 
 
+@attr.s
 class LinearHeuristic(WithProblemContext):
     r"""$$L_p$$ distance to the decision boundary of a binary linear classifier.
 
-    :param problem_ctx: Problem context.
+    :param cache_grad: Cache the forward gradient norm. Only set if the target classifier is a
+            linear model.
     """
+    cache_grad = attr.ib(default=False)
 
     @profiled
     def __call__(self, x):
@@ -131,12 +140,19 @@ class LinearHeuristic(WithProblemContext):
         if ctx.epsilon == 0.0:
             return 0.0
 
+        if self.cache_grad and not hasattr(self, '_cached_grad_norm'):
+            fgrad = get_forward_grad(ctx.clf, x, target_class=ctx.target_class)
+            self._cached_grad_norm = np.linalg.norm(fgrad, ord=ctx.lp_space.q)
+        else:
+            self._cached_grad_norm = None
+
         h = dist_to_decision_boundary(
             clf=ctx.clf,
             target_class=ctx.target_class,
             target_confidence=ctx.target_confidence,
             lp_space=ctx.lp_space,
-            x=x
+            x=x,
+            _grad_norm=self._cached_grad_norm,
         )
         return h * ctx.epsilon
 
@@ -148,15 +164,13 @@ class LinearGridHeuristic(LinearHeuristic):
     This is useful when the transformations in the transformation graph
     have fixed costs.
 
-    :param problem_ctx: Problem context.
     :param grid_step: Regular grid step.
     """
 
-    grid_step = attr.ib()
+    grid_step = attr.ib(default=1)
 
     @profiled
     def __call__(self, x):
         h = super().__call__(x)
         snapped = np.ceil(h / self.grid_step) * self.grid_step
         return snapped
-
