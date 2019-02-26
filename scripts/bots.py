@@ -256,8 +256,11 @@ class RandomHeuristicProblemContext(CategoricalLpProblemContext):
     def get_graph_search_problem(self):
         graph_search_problem = super().get_graph_search_problem()
 
+        # [1, 1] is a unit difference vector for this transformation graph.
+        grid_step = np.linalg.norm([1, 1], ord=self.lp_space.p)
+
         graph_search_problem.expand_fn = NoCostExpandFunc(problem_ctx=self)
-        graph_search_problem.heuristic_fn = lambda x: random.random()
+        graph_search_problem.heuristic_fn = lambda x: random.random() * grid_step
         return graph_search_problem
 
 
@@ -431,6 +434,8 @@ def generate(
                 clf = fit_lr(X_train, y_train, seed=seed)
             elif classifier == 'svmrbf':
                 clf = fit_svmrbf(X_train, y_train, seed=seed)
+
+            logger.info("Model accuracy on test set: %2.2f" % clf.score(X_test, y_test))
 
             expansion_specs, transformable_feature_idxs = get_expansions_specs(
                 feature_names
