@@ -23,15 +23,23 @@ scripts/bots.py \
     --log_file "log/${PATH_PREFIX}.log" \
     --bins $BINS \
     --popularity_band ${BAND} \
-    --beam_size 1 \
     --confidence_level 0.${CONFIDENCE_LEVEL} \
-    --output_pickle "out/reports/${PATH_PREFIX}__hill_climbing.temp.pkl"
+    --output_pickle "out/reports/${PATH_PREFIX}.temp.pkl"
 
 # Adding the UCS results to the A* results.
 scripts/utils/report_cat.py \
     "out/reports/${PATH_PREFIX}__ucs_only.pkl" \
-    "out/reports/${PATH_PREFIX}__hill_climbing.temp.pkl" > \
-    "out/reports/${PATH_PREFIX}__hill_climbing.pkl" && \
+    "out/reports/${PATH_PREFIX}.temp.pkl" > \
+    "out/reports/${PATH_PREFIX}.pkl" && \
     rm \
-    "out/reports/${PATH_PREFIX}__hill_climbing.temp.pkl"
+    "out/reports/${PATH_PREFIX}.temp.pkl"
 
+echo "Generating adversarial examples using hill climbing..."
+scripts/bots.py \
+    1 \
+    --log_file "log/${PATH_PREFIX}__hill_climbing.log" \
+    --bins $BINS \
+    --popularity_band ${BAND} \
+    --confidence_level 0.${CONFIDENCE_LEVEL} \
+    --beam_size 1 \
+    --output_pickle "out/reports/${PATH_PREFIX}__hill_climbing.pkl"
