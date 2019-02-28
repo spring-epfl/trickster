@@ -327,6 +327,9 @@ class WfpProblemContext(CategoricalLpProblemContext):
     heuristic = attr.ib(default="confidence")
     cost = attr.ib(default="zero")
 
+    # Only used if heuristic is random.
+    heuristic_seed = attr.ib(default=0)
+
     def get_graph_search_problem(self):
         if self.cost == "zero":
             expand_fn = ZeroCostExpandFunc(problem_ctx=self)
@@ -335,10 +338,13 @@ class WfpProblemContext(CategoricalLpProblemContext):
 
         if self.heuristic == "confidence":
             raw_heuristic = ConfidenceHeuristic(problem_ctx=self)
+            heuristic_fn = lambda x: raw_heuristic(x.features)
         elif self.heuristic == "dist":
             raw_heuristic = LinearHeuristic(problem_ctx=self)
-
-        heuristic_fn = lambda x: raw_heuristic(x.features)
+            heuristic_fn = lambda x: raw_heuristic(x.features)
+        elif self.heuristic == "random":
+            random.seed(self.heuristic_seed)
+            heuristic_fn = lambda x: random.random()
 
         return GraphSearchProblem(
             goal_fn=GoalFunc(problem_ctx=self),
@@ -528,8 +534,14 @@ def train(
 @click.option(
     "--heuristic",
     default="confidence",
-    type=click.Choice(["confidence", "dist"]),
+    type=click.Choice(["confidence", "dist", "random"]),
     help="Heuristic: target confidence, or distance to the decision boundary."
+)
+@click.option(
+    "--heuristic_seed",
+    default="1",
+    type=int,
+    help="If using random heuristic, its seed.",
 )
 @click.option(
     "--output_pickle",
@@ -559,6 +571,7 @@ def generate(
     cost,
     p_norm,
     heuristic,
+    heuristic_seed,
     output_pickle,
 ):
     """Generate adversarial examples."""
@@ -609,6 +622,7 @@ def generate(
         lp_space=p_norm,
         epsilon=epsilon,
         heuristic=heuristic,
+        heuristic_seed=heuristic_seed,
         cost=cost,
     )
 
