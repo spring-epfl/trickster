@@ -112,10 +112,10 @@ def main(data_path, out_path, r_in, r_out, mintime):
     if not os.path.exists(out_path):
         os.makedirs(out_path)
 
-    for j in tqdm(range(s_sitenum, e_sitenum)):
-        for i in range(0, instnum):
+    for site in tqdm(range(s_sitenum, e_sitenum)):
+        for inst in range(0, instnum):
             packets = []
-            inst_path = os.path.join(data_path, "%i-%i" % (j, i))
+            inst_path = os.path.join(data_path, "%i-%i" % (site, inst))
             if os.path.isfile(inst_path):
                 with open(inst_path, "r") as f:
                     lines = f.readlines()
@@ -131,7 +131,7 @@ def main(data_path, out_path, r_in, r_out, mintime):
                 defend(packets, list2, r_in=r_in, r_out=r_out, mintime=mintime)
                 list2 = sorted(list2, key=lambda list2: list2[0])
 
-                with open(os.path.join(out_path, "%i-%i" % (j, i)), "w") as d:
+                with open(os.path.join(out_path, "%i-%i" % (site, inst)), "w") as d:
                     for x in list2:
                         d.write(repr(x[0]) + "\t" + repr(x[1]) + "\n")
 
