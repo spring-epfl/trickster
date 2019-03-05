@@ -12,11 +12,10 @@ from tqdm import tqdm
 
 
 @click.command()
-@click.option("--full_data_path")
 @click.option("--data_path")
 @click.option("--out_path")
 @click.option("--seed", default=1)
-def main(full_data_path, data_path, out_path, seed):
+def main(data_path, out_path, seed):
     random.seed(seed)
 
     if not os.path.exists(out_path):
@@ -25,6 +24,8 @@ def main(full_data_path, data_path, out_path, seed):
     if not os.path.exists(data_path):
         print("batch folder needs to exist")
         sys.exit(0)
+
+    num_traces = os.listdir(data_path)
 
     for site in tqdm(range(0, 100)):
         for inst in range(0, 90):
@@ -35,8 +36,9 @@ def main(full_data_path, data_path, out_path, seed):
             with open(inst_path, "r") as f1:
                 lines1 = f1.readlines()
 
-            other_site = random.randrange(0, 9000)
-            with open(os.path.join(full_data_path, str(other_site)), "r") as f2:
+            non_monitored_traces = [f for f in os.listdir(data_path) if "-" not in f]
+            camo_trace_path = random.choice(non_monitored_traces)
+            with open(os.path.join(data_path, camo_trace_path), "r") as f2:
                 lines2 = f2.readlines()
 
             start1 = float(lines1[0].split("\t")[0])
