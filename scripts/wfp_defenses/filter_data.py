@@ -25,8 +25,8 @@ for fname in tqdm(os.listdir(DATA_PATH)):
     with open(infname, "r") as f:
         lines = f.readlines()
 
-    # Filter + skip open world traces.
-    if len(lines) > max_trace_len or "-" not in fname:
+    # Filter.
+    if len(lines) > max_trace_len:
         continue
 
     copyfile(infname, outfname)
