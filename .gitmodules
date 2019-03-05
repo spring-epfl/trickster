@@ -1,3 +1,3 @@
 [submodule "scripts/wfp_defenses/wtfpad"]
 	path = scripts/wfp_defenses/wtfpad
-	url = https://github.com/wtfpad/wtfpad.git
+	url = https://github.com/bogdan-kulynych/wtfpad.git
