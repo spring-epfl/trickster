@@ -87,6 +87,7 @@ def prepare_data(
     max_trace_len=None,
     filter_by_len=True,
     normalize=True,
+    verbose=True,
 ):
     """Load a dataset and extract features."""
     logger = logging.getLogger(LOGGER_NAME)
@@ -98,6 +99,7 @@ def prepare_data(
         max_traces=max_traces,
         max_trace_len=max_trace_len,
         filter_by_len=filter_by_len,
+        verbose=verbose,
         return_idxs=True,
     )
 
@@ -257,6 +259,12 @@ class TraceNode:
 
         children = []
         for i in range(len(self.trace)):
+            trace = insert_dummy_packets(self.trace, i, self.dummies_per_insertion)
+            if self.max_len is not None and (len(trace) > self.max_len):
+                trace = trace[: self.max_len]
+            node = self.clone(new_trace=trace, new_depth=self.depth + 1)
+            children.append(node)
+
             trace = insert_dummy_packets(self.trace, i, self.dummies_per_insertion)
             if self.max_len is not None and (len(trace) > self.max_len):
                 trace = trace[: self.max_len]

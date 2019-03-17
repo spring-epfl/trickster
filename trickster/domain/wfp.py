@@ -9,6 +9,9 @@ import numpy as np
 from tqdm import tqdm
 
 
+MTU = 1443
+
+
 def extract(trace, interpolated_features=True):
     """Extract CUMUL features from a single trace.
 
@@ -80,13 +83,15 @@ def extract(trace, interpolated_features=True):
     return np.array(features)
 
 
-def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_len=True):
+def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_len=True,
+                   normalize_mtu=True):
     """Load cell data from file.
 
     :param time: If zero, don't load packet times (saves time and memoty).
     :param ext: Data format/extension. One of ``[".htor", ".cell", ".burst"]``
     :param max_len: Max trace length.
     :param filter_by_len: If True, traces over the max_len will be dropped.
+    :param convert_mtu: Normalize packet sizes to multiples of MTU.
     """
     data = []
     starttime = -1
@@ -114,8 +119,11 @@ def load_cell_data(filename, time=0, ext=".cell", max_len=None, filter_by_len=Tr
 
         if ext == ".cell":
             for li in lines:
-                li = li.split("\t")
-                p = int(li[1])
+                li = li.strip("\n").split("\t")
+                p = float(li[1])
+                if abs(p) != 1 and normalize_mtu:
+                    p /= MTU
+                p = int(p)
                 if time == 0:
                     data.append(p)
                 if time == 1:
@@ -289,12 +297,13 @@ def reverse_onehot(encoded_trace, trace_len=None):
     return raw_trace
 
 
-def insert_dummy_packets(trace, index, num_dummies=1):
+def insert_dummy_packets(trace, index, num_dummies=1, direction=1):
     """Insert dummy packets to the trace at a given position.
 
     :param trace: Trace
     :param index: Index before which to insert the packets
     :param num_dummies: Number of dummy packets to insert
+    :param direction: Dummy direction, one of [+1, -1]
 
     >>> insert_dummy_packets([1, -1, 1], 0)
     [1, 1, -1, 1]
@@ -306,8 +315,11 @@ def insert_dummy_packets(trace, index, num_dummies=1):
     [1, -1, 1, 1]
     >>> insert_dummy_packets([1, -1, 1], 0, num_dummies=2)
     [1, 1, 1, -1, 1]
+    >>> insert_dummy_packets([1, -1, 1], 0, direction=-1)
+    [-1, 1, -1, 1]
     """
     if index > 0 and trace[index - 1] == 0:
         return None
-    extended = trace[:index] + [1] * num_dummies + trace[index:]
+    extended = trace[:index] + [direction] * num_dummies + trace[index:]
     return extended
+
