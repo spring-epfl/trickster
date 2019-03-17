@@ -4,10 +4,14 @@ NPROC=${NPROC:=4}
 ITER_LIM=5000
 GENERATION_MAX_TRACE_LEN=2000
 DUMMIES_PER_INSERTION=1
-
-MODEL_TYPE=svmrbf jobs/train_cumul.sh
-
 PATH_PREFIX="wfp_full__model_svmrbf__dummies_${DUMMIES_PER_INSERTION}__tracelen_${GENERATION_MAX_TRACE_LEN}__iter_${ITER_LIM}"
+
+echo "Training the model..."
+scripts/wfp_attacks.py train \
+    --model svmrbf \
+    --features cumul \
+    --no_normalize \
+    --model_pickle "out/models/model_full_svmrbf_cumul.pkl" \
 
 echo "Generating adversarial examples using hill climbing..."
 scripts/wfp_attacks.py generate \
@@ -17,7 +21,7 @@ scripts/wfp_attacks.py generate \
     --heuristic "confidence" \
     --epsilon 1 \
     --iter_lim $ITER_LIM \
-    --confidence_level 0.52 \
+    --confidence_level 0.501 \
     --features cumul \
     --max_trace_len $GENERATION_MAX_TRACE_LEN \
     --dummies_per_insertion ${DUMMIES_PER_INSERTION} \
@@ -35,6 +39,7 @@ seq 1 10 | parallel -j $NPROC \
         --heuristic_seed {} \
         --epsilon 1 \
         --iter_lim $ITER_LIM \
+        --confidence_level 0.501 \
         --features cumul \
         --max_trace_len $GENERATION_MAX_TRACE_LEN \
         --dummies_per_insertion ${DUMMIES_PER_INSERTION} \
