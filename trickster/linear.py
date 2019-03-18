@@ -99,8 +99,17 @@ def create_reduced_linear_classifier(clf, x, transformable_feature_idxs):
     return clf_reduced
 
 
+def _compute_grad_norm(
+    clf, x, target_class, target_confidence, lp_space, inv_feature_weights=None,
+):
+    fgrad = get_forward_grad(clf, x, target_class=target_class)
+    if inv_feature_weights is not None:
+        fgrad *= inv_feature_weights
+    return np.linalg.norm(fgrad, ord=lp_space.q)
+
+
 def dist_to_decision_boundary(
-    clf, x, target_class, target_confidence, lp_space, _grad_norm=None
+    clf, x, target_class, target_confidence, lp_space, inv_feature_weights=None, _grad_norm=None
 ):
     """
     Compute distance to the decision boundary of a binary linear classifier.
@@ -117,11 +126,12 @@ def dist_to_decision_boundary(
         delta *= -1 if target_class == 1 else 1
         score += delta
 
-    # Compute the distance to the boundary.
     if _grad_norm is None:
-        fgrad = get_forward_grad(clf, x, target_class=target_class)
-        _grad_norm = np.linalg.norm(fgrad, ord=lp_space.q)
+        _grad_norm = _compute_grad_norm(
+            clf, x, target_class, target_confidence, lp_space, inv_feature_weights
+        )
 
+    # Compute the distance to the boundary.
     return np.abs(score) / _grad_norm
 
 
@@ -129,10 +139,23 @@ def dist_to_decision_boundary(
 class LinearHeuristic(WithProblemContext):
     r"""$$L_p$$ distance to the decision boundary of a binary linear classifier.
 
-    :param cache_grad: Cache the forward gradient norm. Only set if the target classifier is a
-            linear model.
+    :param cache_grad: Cache the forward gradient norm.
+    :param weight_vec: Feature-wise weights if the $$L_p$$ space is weighted.
     """
-    cache_grad = attr.ib(default=False)
+    cache_grad = attr.ib(default=True)
+    weight_vec = attr.ib(default=None)
+
+    def __attrs_post_init__(self):
+        if self.weight_vec is None:
+            self._inv_weight_vec = None
+        else:
+            if not isinstance(self.weight_vec, np.ndarray):
+                self.weight_vec = np.array(self.weight_vec)
+            self.weight_vec = self.weight_vec.astype(np.float)
+
+            self._inv_weight_vec = np.zeros(self.weight_vec.shape, dtype=np.float)
+            pos_mask = self.weight_vec > 0
+            self._inv_weight_vec[pos_mask] = self.weight_vec[pos_mask].astype(np.float) ** -1
 
     @profiled
     def __call__(self, x):
@@ -141,17 +164,24 @@ class LinearHeuristic(WithProblemContext):
             return 0.0
 
         if self.cache_grad and not hasattr(self, '_cached_grad_norm'):
-            fgrad = get_forward_grad(ctx.clf, x, target_class=ctx.target_class)
-            self._cached_grad_norm = np.linalg.norm(fgrad, ord=ctx.lp_space.q)
+            self._cached_grad_norm = _compute_grad_norm(
+                x=x,
+                clf=ctx.clf,
+                target_class=ctx.target_class,
+                target_confidence=ctx.target_confidence,
+                lp_space=ctx.lp_space,
+                inv_feature_weights=self._inv_weight_vec,
+            )
         else:
             self._cached_grad_norm = None
 
         h = dist_to_decision_boundary(
+            x=x,
             clf=ctx.clf,
             target_class=ctx.target_class,
             target_confidence=ctx.target_confidence,
             lp_space=ctx.lp_space,
-            x=x,
+            inv_feature_weights=self._inv_weight_vec,
             _grad_norm=self._cached_grad_norm,
         )
         return h * ctx.epsilon

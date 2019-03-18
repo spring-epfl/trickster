@@ -34,7 +34,7 @@ class FakeModel:
         return np.hstack([1 - p, p])
 
     def grad(self, x, target_class=None):
-        result = np.array([2, -1])
+        result = np.array([2., -1.])
         if target_class == 0:
             result *= -1
         return result
@@ -59,6 +59,14 @@ def test_heuristic_source_side(problem_ctx):
     # f([0, 6]) = -3, ||grad(f)|| = ||[2, -1]|| = 2  (inf-norm)
     # h = |-3| / 2 = 1.5
     assert h([0, 6]) == pytest.approx(1.5)
+
+
+def test_heuristic_weighted_norm(problem_ctx):
+    h = LinearHeuristic(problem_ctx, weight_vec=[5, 0])
+
+    # f([0, 6]) = -3, ||grad(f)|| = ||[1/5 * 2, 0 * -1]|| = 0.4  (inf-norm)
+    # h = |-3| / 0.4 = 30 / 4
+    assert h([0, 6]) == pytest.approx(7.5)
 
 
 @pytest.mark.parametrize("target_class", [0, 1])
