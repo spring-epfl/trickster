@@ -265,7 +265,7 @@ class TraceNode:
             node = self.clone(new_trace=trace, new_depth=self.depth + 1)
             children.append(node)
 
-            trace = insert_dummy_packets(self.trace, i, self.dummies_per_insertion)
+            trace = insert_dummy_packets(self.trace, i, self.dummies_per_insertion, direction=-1)
             if self.max_len is not None and (len(trace) > self.max_len):
                 trace = trace[: self.max_len]
             node = self.clone(new_trace=trace, new_depth=self.depth + 1)
