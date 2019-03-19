@@ -10,15 +10,15 @@ from trickster.utils.counter import ExpansionCounter, CounterLimitExceededError
 
 
 def expand_quantized_increment(sample, feat_idxs):
-    '''
-    Get the neighbouring value (shift '1' right) in a quantized one-hot feature vector."""
+    """
+    Get the neighbouring value (shift '1' right) in a quantized one-hot feature vector.
 
     :param sample: Initial node.
     :type sample: numpy array.
     :param feat_idxs: Indexes pointing to transformable features in the sample array.
     :type feat_idxs: numpy array or list of ints.
     :returns: list of numpy arrays.
-    '''
+    """
     if len(feat_idxs) == 0:
         return []
 
@@ -54,6 +54,28 @@ def expand_quantized_decrement(sample, feat_idxs):
     if idx != 0:
         child = np.array(sample)
         child[feat_idxs] = np.roll(sub_sample, -1)
+        children.append(child)
+
+    return children
+
+
+def expand_quantized_increase(sample, feat_idxs):
+    """
+    Expand all higher values of a single categorical feature.
+
+    :param sample: Initial node.
+    :type sample: numpy array.
+    :param feat_idxs: Indexes pointing to transformable features in the sample array.
+    :type feat_idxs: numpy array or list of ints.
+    :returns: list of numpy arrays.
+    """
+    sub_sample = sample[feat_idxs]
+    idx = np.argmax(sub_sample)
+    children = []
+
+    for i in range(1, idx + 1):
+        child = np.array(sample)
+        child[feat_idxs] = np.roll(sub_sample, i)
         children.append(child)
 
     return children
@@ -178,11 +200,14 @@ class FeatureExpansionSpec:
     :param idxs: Indexes in a feature vector that correspond to this feature.
     :param expand_fn: Expansion funciton.
     :param feature_name: Feature name.
+    :param weights: Feature-wise weights.
     """
 
     idxs: typing.List[int]
     expand_fn: typing.Callable
     feature_name: str = None
+    weights: typing.List[float] = None
+    extras: typing.List = None
 
 
 def expand(sample, expansion_specs):

@@ -45,6 +45,35 @@ def test_expand_quantized_decrement(a, feat_idxs, expected):
     "a, feat_idxs, expected",
     [
         (A, FEAT_IDXS[0], []),
+        (A, FEAT_IDXS[1], [[0, 0, 0, 0, 1, 0, 0]]),
+        (
+            A,
+            FEAT_IDXS[2],
+            [
+                [0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 1, 0],
+            ],
+        ),
+        (
+            A,
+            FEAT_IDXS[3],
+            [
+                [0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 0, 1],
+            ],
+        ),
+    ],
+)
+def test_expand_quantized_increase(a, feat_idxs, expected):
+    children = expand_quantized_increase(a, feat_idxs)
+    assert np.array_equal(np.array(children), np.array(expected))
+
+
+@pytest.mark.parametrize(
+    "a, feat_idxs, expected",
+    [
+        (A, FEAT_IDXS[0], []),
         (A, FEAT_IDXS[1], [[0, 0, 0, 0, 1, 0, 0], [0, 0, 1, 0, 0, 0, 0]]),
         (A, FEAT_IDXS[2], [[0, 0, 0, 0, 1, 0, 0], [0, 0, 1, 0, 0, 0, 0]]),
         (A, FEAT_IDXS[3], [[0, 0, 0, 0, 1, 0, 0], [0, 0, 1, 0, 0, 0, 0]]),
