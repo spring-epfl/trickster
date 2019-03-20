@@ -23,7 +23,7 @@ from sklearn.model_selection import train_test_split
 from trickster.optim import run_experiment
 from trickster.optim import SpecExpandFunc
 from trickster.optim import CategoricalLpProblemContext
-from trickster.linear import LinearGridHeuristic
+from trickster.linear import LinearGridHeuristic, LinearHeuristic
 from trickster.utils.log import setup_custom_logger
 from trickster.search import a_star_search
 from trickster.domain.categorical import *
@@ -62,7 +62,7 @@ def _transform_source_identity(X_k, sources_count=7):
     return X_k_transformed
 
 
-def load_transform_data(human_dataset, bot_dataset, drop_features, bins, **kwargs):
+def load_transform_data(human_dataset, bot_dataset, drop_features, bins, logger, **kwargs):
     """
     Load and preprocess data, returning the examples and labels as numpy.
     """
@@ -90,10 +90,13 @@ def load_transform_data(human_dataset, bot_dataset, drop_features, bins, **kwarg
 
         # Drop feature if there is only 1 distinct value.
         if np.unique(df[column]).size == 1:
+            logger.warn("Dropping feature because only one unique value: %s" % column)
             df = df.drop(column, axis=1)
             continue
 
         df[column] = pd.qcut(df[column], bins, duplicates="drop")
+
+    logger.info("Features:\n %s" % pprint.pformat(list(df.columns)))
 
     # Encode 'source_identity' field by setting '1's if source is present.
     transformed = _transform_source_identity(df.loc[:, "source_identity"])
@@ -154,7 +157,7 @@ def fit_svmrbf(X_train, y_train, seed=1):
     """
     Fit an SVM-RBF with pre-selected hyperparameters.
     """
-    clf = SVC(C=10, gamma=0.01, kernel='rbf', probability=True, random_state=seed)
+    clf = SVC(C=10, gamma=0.01, kernel="rbf", probability=True, random_state=seed)
     clf.fit(X_train, y_train)
     return clf
 
@@ -241,6 +244,158 @@ def get_expansions_specs(features=None):
     return expansions, transformable_feature_idxs
 
 
+def get_boundaries(bucket_names):
+    """
+    Get boundaries of pandas-quantized features.
+
+    >>> bucket_names = ["whatever_(100.0, 1000.0)", "whatever_(-100.0, 100.0)"]
+    >>> get_boundaries(bucket_names)
+    [(100.0, 1000.0), (-100.0, 100.0)]
+    """
+    boundaries = []
+    for bucket_name in bucket_names:
+        boundaries_str = bucket_name.split("_")[-1]
+        lo_str, hi_str = boundaries_str.strip("[]() ").split(",")
+        boundaries.append((float(lo_str), float(hi_str)))
+
+    return boundaries
+
+
+@attr.s
+class FeatureDollarCostExtras:
+    boundaries = attr.ib()
+    price_per_unit = attr.ib()
+    min_unit = attr.ib(default=1)
+    normalized = attr.ib(default=False)
+    override_weight = attr.ib(default=None)
+
+
+def compute_buyretweet_weight_vec(example, specs, normalizer=1):
+    """
+    Get a weight vector for buyretweet graph from a given example and feature expansion specs.
+
+    >>> spec = FeatureExpansionSpec(idxs=[0, 1, 2, 3], expand_fn="dummy")
+    >>> spec.extras = FeatureDollarCostExtras([(1, 2), (2, 3), (3, 10), (10, 100)], 10)
+    >>> example = np.array([0, 1, 0, 0, 0])
+    >>> compute_buyretweet_weight_vec(example, [spec])
+    array([ 0.,  0., 10., 70.,  0.])
+    """
+    if not isinstance(example, np.ndarray):
+        example = np.array(example)
+
+    weights = np.zeros(example.shape)
+    for spec in specs:
+        current_val_index = np.argmax(example[spec.idxs])
+        _, current_hi_boundary = spec.extras.boundaries[current_val_index]
+        for weight_index, orig_index in enumerate(spec.idxs):
+            if spec.extras.override_weight is not None:
+                weights[orig_index] = spec.extras.override_weight
+            elif weight_index <= current_val_index:
+                weights[orig_index] = 0.0
+            else:
+                lo_boundary, _ = spec.extras.boundaries[weight_index]
+                diff = lo_boundary - current_hi_boundary
+                diff = max(diff, spec.extras.min_unit)
+                if diff < 1:
+                    import ipdb; ipdb.set_trace()
+                if spec.extras.normalized:
+                    diff *= normalizer
+                weights[orig_index] = diff * spec.extras.price_per_unit
+
+    return weights
+
+
+def get_buyretweet_expansions_specs(features=None):
+    """
+    Define expansions to perform on features and obtain feature indexes.
+
+    :param features: (Quantized) feature names.
+    """
+
+    # Find indexes of required features in the original feature space.
+    idxs_tweeted = find_substring_occurences(features, "user_tweeted")
+    idxs_retweeted = find_substring_occurences(features, "user_retweeted")
+    idxs_replied = find_substring_occurences(features, "user_replied")
+    idxs_likes_per_tweet = find_substring_occurences(features, "likes_per_tweet")
+    idxs_retweets_per_tweet = find_substring_occurences(features, "retweets_per_tweet")
+
+    # Concatenate indexes of transformable features.
+    transformable_feature_idxs = sorted(
+        idxs_tweeted + idxs_retweeted + idxs_replied +
+        idxs_likes_per_tweet + idxs_retweets_per_tweet)
+    reduced_features = features[transformable_feature_idxs]
+
+    # Find indexes of required features in the reduced feature space.
+    idxs_tweeted = find_substring_occurences(reduced_features, "user_tweeted")
+    idxs_retweeted = find_substring_occurences(reduced_features, "user_retweeted")
+    idxs_replied = find_substring_occurences(reduced_features, "user_replied")
+    idxs_likes_per_tweet = find_substring_occurences(
+        reduced_features, "likes_per_tweet"
+    )
+    idxs_retweets_per_tweet = find_substring_occurences(
+        reduced_features, "retweets_per_tweet"
+    )
+
+    expansions = [
+        FeatureExpansionSpec(
+            feature_name="user_tweeted",
+            idxs=idxs_tweeted,
+            expand_fn=expand_quantized_increase,
+            extras=FeatureDollarCostExtras(
+                boundaries=get_boundaries(reduced_features[idxs_tweeted]),
+                price_per_unit=2.0,
+                min_unit=1,
+            ),
+        ),
+        # This feature is not present in the transformation graph. Only need to keep it
+        # for metadata.
+        FeatureExpansionSpec(
+            feature_name="user_retweeted",
+            idxs=idxs_retweeted,
+            expand_fn=noop,
+            extras=FeatureDollarCostExtras(
+                boundaries=get_boundaries(reduced_features[idxs_retweeted]),
+                price_per_unit=0,
+                override_weight=0
+            ),
+        ),
+        FeatureExpansionSpec(
+            feature_name="user_replied",
+            idxs=idxs_replied,
+            expand_fn=expand_quantized_increase,
+            extras=FeatureDollarCostExtras(
+                boundaries=get_boundaries(reduced_features[idxs_replied]),
+                price_per_unit=2.0,
+                min_unit=1,
+            ),
+        ),
+        FeatureExpansionSpec(
+            feature_name="likes_per_tweet",
+            idxs=idxs_likes_per_tweet,
+            expand_fn=expand_quantized_increase,
+            extras=FeatureDollarCostExtras(
+                boundaries=get_boundaries(reduced_features[idxs_likes_per_tweet]),
+                price_per_unit=0.025,
+                min_unit=1,
+                normalized=True
+            ),
+        ),
+        FeatureExpansionSpec(
+            feature_name="retweets_per_tweet",
+            idxs=idxs_retweets_per_tweet,
+            expand_fn=expand_quantized_increase,
+            extras=FeatureDollarCostExtras(
+                boundaries=get_boundaries(reduced_features[idxs_retweets_per_tweet]),
+                price_per_unit=0.025,
+                min_unit=1,
+                normalized=True
+            ),
+        ),
+    ]
+
+    return expansions, transformable_feature_idxs
+
+
 class NoCostExpandFunc(SpecExpandFunc):
     """Expand function that drops the costs."""
 
@@ -253,8 +408,8 @@ class NoCostExpandFunc(SpecExpandFunc):
 class RandomHeuristicProblemContext(CategoricalLpProblemContext):
     seed = attr.ib(default=1)
 
-    def get_graph_search_problem(self):
-        graph_search_problem = super().get_graph_search_problem()
+    def get_graph_search_problem(self, x):
+        graph_search_problem = super().get_graph_search_problem(x)
 
         # [1, 1] is a unit difference vector for this transformation graph.
         grid_step = np.linalg.norm([1, 1], ord=self.lp_space.p)
@@ -266,13 +421,43 @@ class RandomHeuristicProblemContext(CategoricalLpProblemContext):
 
 @attr.s
 class GridHeuristicProblemContext(CategoricalLpProblemContext):
-    def get_graph_search_problem(self):
-        graph_search_problem = super().get_graph_search_problem()
+    def get_graph_search_problem(self, x):
+        graph_search_problem = super().get_graph_search_problem(x)
 
         # [1, 1] is a unit difference vector for this transformation graph.
         grid_step = np.linalg.norm([1, 1], ord=self.lp_space.p)
 
         raw_heuristic = LinearGridHeuristic(problem_ctx=self, grid_step=grid_step)
+        graph_search_problem.heuristic_fn = lambda x: raw_heuristic(x.features)
+        return graph_search_problem
+
+
+def get_num_total_tweets(x, specs):
+    """Return a lower bound on the number of tweets and retweets."""
+    result = 1
+    for spec in specs:
+        if spec.feature_name in ["user_tweeted", "user_retweeted"]:
+            idx = np.argmax(x[spec.idxs])
+            lo, _ = spec.extras.boundaries[idx]
+            result += lo
+    return result
+
+
+@attr.s
+class DollarCostProblemContext(CategoricalLpProblemContext):
+    features = attr.ib(default=None)
+
+    def get_graph_search_problem(self, x):
+        assert self.features is not None
+        graph_search_problem = super().get_graph_search_problem(x)
+
+        num_tweets = get_num_total_tweets(x, self.expansion_specs)
+        weight_vec = compute_buyretweet_weight_vec(x, self.expansion_specs,
+                normalizer=num_tweets)
+
+        expand_fn = SpecExpandFunc(problem_ctx=self, weight_vec=weight_vec)
+        graph_search_problem.expand_fn = expand_fn
+        raw_heuristic = LinearHeuristic(problem_ctx=self, weight_vec=weight_vec)
         graph_search_problem.heuristic_fn = lambda x: raw_heuristic(x.features)
         return graph_search_problem
 
@@ -322,9 +507,15 @@ class GridHeuristicProblemContext(CategoricalLpProblemContext):
     help="Target classifier",
 )
 @click.option(
+    "--graph",
+    default="all",
+    type=click.Choice(["all", "buyretweet"]),
+    help="Transformation graph.",
+)
+@click.option(
     "--heuristic",
     default="dist",
-    type=click.Choice(["dist", "dist_grid", "random"]),
+    type=click.Choice(["dist", "dist_grid", "random", "dollar"]),
     help="Heuristic",
 )
 @click.option(
@@ -339,12 +530,7 @@ class GridHeuristicProblemContext(CategoricalLpProblemContext):
     type=click.Choice(["1", "2", "inf"]),
     help="The p parameter of the Lp norm for computing the cost.",
 )
-@click.option(
-    "--beam_size",
-    default=None,
-    type=int,
-    help="Size of the A* fringe.",
-)
+@click.option("--beam_size", default=None, type=int, help="Size of the A* fringe.")
 @click.option(
     "--confidence_level",
     default=0.5,
@@ -377,6 +563,7 @@ def generate(
     p_norm,
     beam_size,
     classifier,
+    graph,
     heuristic,
     heuristic_seed,
     confidence_level,
@@ -385,7 +572,7 @@ def generate(
 ):
     np.random.seed(seed=seed)
     logger = setup_custom_logger(log_file)
-    logger.info("Params: %s" % pprint.pformat(ctx.params))
+    logger.info("Params:\n%s" % pprint.pformat(ctx.params))
 
     # Dataset locations.
     human_dataset = human_dataset_template.format(popularity_band)
@@ -424,40 +611,55 @@ def generate(
                 bot_dataset=bot_dataset,
                 drop_features=drop_features,
                 bins=bins,
+                logger=logger,
             )
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=0.1, random_state=seed
             )
 
+            logger.info("X_train.shape: %s" % str(X_train.shape))
+            logger.info("X_test.shape: %s" % str(X_test.shape))
             logger.info("Fitting a model.")
-            if classifier == 'lr':
+            if classifier == "lr":
                 clf = fit_lr(X_train, y_train, seed=seed)
-            elif classifier == 'svmrbf':
+            elif classifier == "svmrbf":
                 clf = fit_svmrbf(X_train, y_train, seed=seed)
 
             logger.info("Model accuracy on test set: %2.2f" % clf.score(X_test, y_test))
-
-            expansion_specs, transformable_feature_idxs = get_expansions_specs(
-                feature_names
-            )
+            logger.info("Baseline on test set: %2.2f" % max(y_test.mean(), 1-y_test.mean()))
 
             problem_ctx_params = dict(
                 clf=clf,
                 target_class=0,
                 target_confidence=confidence_level,
                 lp_space=p_norm,
-                expansion_specs=expansion_specs,
                 epsilon=epsilon,
             )
-            if heuristic == "dist":
-                problem_ctx = CategoricalLpProblemContext(**problem_ctx_params)
 
-            elif heuristic == "dist_grid":
-                problem_ctx = GridHeuristicProblemContext(**problem_ctx_params)
+            if graph == "all":
+                expansion_specs, transformable_feature_idxs = get_expansions_specs(
+                    feature_names
+                )
+                problem_ctx_params["expansion_specs"] = expansion_specs
 
-            elif heuristic == "random":
-                problem_ctx = RandomHeuristicProblemContext(
-                    seed=heuristic_seed, **problem_ctx_params
+                if heuristic == "dist":
+                    problem_ctx = CategoricalLpProblemContext(**problem_ctx_params)
+
+                elif heuristic == "dist_grid":
+                    problem_ctx = GridHeuristicProblemContext(**problem_ctx_params)
+
+                elif heuristic == "random":
+                    problem_ctx = RandomHeuristicProblemContext(
+                        seed=heuristic_seed, **problem_ctx_params
+                    )
+
+            elif graph == "buyretweet":
+                expansion_specs, transformable_feature_idxs = get_buyretweet_expansions_specs(
+                    feature_names
+                )
+                problem_ctx_params["expansion_specs"] = expansion_specs
+                problem_ctx = DollarCostProblemContext(
+                    features=feature_names, **problem_ctx_params
                 )
 
             logger.info("Running the attack...")
@@ -469,6 +671,8 @@ def generate(
                 transformable_feature_idxs=transformable_feature_idxs,
                 logger=logger,
             )
+
+            logger.info("Success rate: %2.2f" % result["search_results"].found.mean())
 
             # Record extra data.
             result["features"] = feature_names

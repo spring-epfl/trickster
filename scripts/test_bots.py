@@ -53,7 +53,7 @@ def invoke_bots_script(*args, **kwargs):
     # "random",
 ])
 @pytest.mark.parametrize("classifier", ["lr", "svmrbf"])
-def test_generation(file_factory, heuristic, classifier):
+def test_generation_all(file_factory, heuristic, classifier):
     with file_factory() as results_file:
         if classifier == "svmrbf":
             reduce_classifier = False
@@ -66,6 +66,7 @@ def test_generation(file_factory, heuristic, classifier):
             # Let's make the task easy.
             bins=20,
             confidence_level=0.5,
+            graph="all",
             iter_lim=2,
             heuristic=heuristic,
             classifier=classifier,
@@ -81,4 +82,30 @@ def test_generation(file_factory, heuristic, classifier):
     assert len(results[0]["search_results"].found) > 0
     # 41 examples for LR and 42 examples for SVM.
     assert len(results[0]["search_results"]) >= 41
+
+
+def test_generation_buyretweet(file_factory):
+    with file_factory() as results_file:
+        log = invoke_bots_script(
+            "100",
+            output_pickle=results_file.name,
+            # Let's make the task easy.
+            bins=20,
+            graph="buyretweet",
+            confidence_level=0.5,
+            iter_lim=2,
+            classifier="lr",
+            popularity_band="100k",
+            reduce_classifier=True,
+            human_dataset_template=DATA_PATH + "/humans/humans.{}.csv",
+            bot_dataset_template=DATA_PATH + "/bots/bots.{}.csv",
+        )
+
+        assert "found" in log
+        results = pd.read_pickle(results_file.name)
+
+    # One example is expected to be found.
+    assert len(results[0]["search_results"].found) > 0
+    # 41 examples for LR and 42 examples for SVM.
+    assert len(results[0]["search_results"]) == 73
 
