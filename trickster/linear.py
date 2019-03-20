@@ -16,7 +16,7 @@ from trickster.base import WithProblemContext
 
 
 def _get_forward_grad_lr(clf, x, target_class=None):
-    return clf.coef_[0]
+    return np.array(clf.coef_[0])
 
 
 def _get_forward_grad_svm_rbf(clf, x, target_class=None):
