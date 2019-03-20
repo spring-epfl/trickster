@@ -6,6 +6,8 @@ import attr
 import typing
 import numpy as np
 
+import warnings
+
 from trickster.utils.counter import ExpansionCounter, CounterLimitExceededError
 
 
@@ -73,12 +75,17 @@ def expand_quantized_increase(sample, feat_idxs):
     idx = np.argmax(sub_sample)
     children = []
 
-    for i in range(1, idx + 1):
+    for i in range(1, len(feat_idxs) - idx):
         child = np.array(sample)
         child[feat_idxs] = np.roll(sub_sample, i)
         children.append(child)
 
     return children
+
+
+def noop(sample, feat_idxs):
+    """Don't expand."""
+    return []
 
 
 def expand_quantized(sample, feat_idxs):
@@ -206,7 +213,6 @@ class FeatureExpansionSpec:
     idxs: typing.List[int]
     expand_fn: typing.Callable
     feature_name: str = None
-    weights: typing.List[float] = None
     extras: typing.List = None
 
 
@@ -260,6 +266,7 @@ class Node:
         counter.increment()
 
         for child in expand(self.src, expansion_specs):
+
             children.append(
                 self.__class__(
                     src=child,
