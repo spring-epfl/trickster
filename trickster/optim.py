@@ -7,6 +7,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+import pprint
 import logging
 
 import attr
@@ -58,12 +59,12 @@ class CategoricalLpProblemContext(ProblemContext):
     lp_space: LpSpace = attr.ib(default=1, converter=LpSpace)
     expansion_specs: typing.List[FeatureExpansionSpec] = attr.Factory(list)
 
-    def get_graph_search_problem(self):
+    def get_graph_search_problem(self, x):
         problem_ctx = self
         expand_fn = SpecExpandFunc(problem_ctx=problem_ctx)
         goal_fn = GoalFunc(problem_ctx=problem_ctx)
 
-        raw_heuristic = linear.LinearHeuristic(problem_ctx=problem_ctx)
+        raw_heuristic = linear.LinearHeuristic(problem_ctx=problem_ctx, cache_grad=True)
         heuristic_fn = lambda x: raw_heuristic(x.features)
 
         bench_cost_fn = BenchCost(problem_ctx=problem_ctx)
@@ -79,20 +80,27 @@ class CategoricalLpProblemContext(ProblemContext):
         )
 
 
+@attr.s
 class SpecExpandFunc(WithProblemContext):
     """
     Expand candidates using given specs with each transformation having $L_p$ cost.
     """
 
+    weight_vec = attr.ib(default=None)
+
     @profiled
     def __call__(self, x):
-        children = x.expand(self.problem_ctx.expansion_specs)
-        costs = [
-            np.linalg.norm(x.features - c.features, ord=self.problem_ctx.lp_space.p)
-            for c in children
-        ]
+        results = []
+        for child in x.expand(self.problem_ctx.expansion_specs):
+            diff = x.features - child.features
+            if self.weight_vec is not None:
+                diff *= self.weight_vec
+            cost = np.linalg.norm(diff, ord=self.problem_ctx.lp_space.p)
+            if cost == 0:
+                warnings.warn("Expansion with zero cost encountered.")
+            results.append((child, cost))
 
-        return list(zip(children, costs))
+        return list(results)
 
 
 class GoalFunc(WithProblemContext):
@@ -152,6 +160,7 @@ def _dataset_find_adversarial_examples(
     reduce_classifier=True,
     counter_kwargs=None,
     graph_search_kwargs=None,
+    get_cost_weights_fn=None
 ):
     """Find adversarial examples for specified indexes, and record statistics for reporting.
 
@@ -195,6 +204,7 @@ def _dataset_find_adversarial_examples(
         )
 
         orig_example = data[idx]
+
         if issparse(orig_example):
             orig_example = orig_example.toarray()
 
@@ -232,7 +242,7 @@ def _dataset_find_adversarial_examples(
         path = None
 
         # Run the search.
-        graph_search_problem = problem_ctx.get_graph_search_problem()
+        graph_search_problem = problem_ctx.get_graph_search_problem(example)
         try:
             wrapped_x_adv, path_costs, path = _find_adversarial_example(
                 initial_example_node=get_node_fn(example),
@@ -321,6 +331,8 @@ def _dataset_find_adversarial_examples(
                 "runtime": runtime,
             }
 
+        logger.debug(pprint.pformat(results.loc[i]))
+
         problem_ctx = orig_problem_ctx
 
     return results
@@ -333,6 +345,7 @@ def run_experiment(
     reduce_classifier=True,
     transformable_feature_idxs=None,
     make_graph_search_problem=None,
+    get_cost_weights_fn=None,
     graph_search_kwargs=None,
     logger=None,
 ):
@@ -365,8 +378,8 @@ def run_experiment(
     # Indices of examples in the original class that are within a margin.
     preds = problem_ctx.clf.predict_proba(X)[:, problem_ctx.target_class]
     idxs, = np.where(
-        (preds < problem_ctx.target_confidence)
-        & (preds >= (problem_ctx.target_confidence - confidence_margin))
+        (preds < 0.5)
+        & (preds >= (0.5 - confidence_margin))
     )
 
     # Perform adversarial example graph search.
@@ -381,8 +394,9 @@ def run_experiment(
         idxs=idxs,
         problem_ctx=problem_ctx,
         reduce_classifier=reduce_classifier,
-        graph_search_kwargs=graph_search_kwargs,
         transformable_feature_idxs=transformable_feature_idxs,
+        graph_search_kwargs=graph_search_kwargs,
+        get_cost_weights_fn=get_cost_weights_fn
     )
 
     # Compute feature importance based on the count of feature transformations.
