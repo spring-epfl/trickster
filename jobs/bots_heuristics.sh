@@ -9,17 +9,6 @@ PATH_PREFIX="bots__band_${BAND}__target_${CONFIDENCE_LEVEL}"
 
 EPSILONS="1"
 
-
-echo "Generating adversarial examples with L1 grid heuristic..."
-scripts/bots.py \
-    $EPSILONS \
-    --log_file "log/${PATH_PREFIX}__h_grid.log" \
-    --popularity_band ${BAND} \
-    --confidence_level 0.${CONFIDENCE_LEVEL} \
-    --bins $BINS \
-    --heuristic "dist_grid" \
-    --output_pickle "out/reports/${PATH_PREFIX}__h_grid.pkl"
-
 echo "Generating adversarial examples with L2 heuristic..."
 scripts/bots.py \
     $EPSILONS \
