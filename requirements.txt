@@ -69,7 +69,7 @@ pyparsing==2.2.0
 pytest==3.10.0
 python-dateutil==2.7.4
 pytz==2018.5
-PyYAML==4.2b4
+PyYAML==5.4
 qtconsole==4.4.2
 requests==2.20.1
 s3transfer==0.1.13
