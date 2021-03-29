@@ -17,7 +17,7 @@ numpy==1.15.4
 packaging==18.0
 pluggy==0.8.0
 py==1.7.0
-Pygments==2.3.0
+Pygments==2.7.4
 pyparsing==2.3.0
 pytest==4.0.1
 pytest-lazy-fixture==0.4.2
