@@ -16,7 +16,7 @@ more-itertools==4.3.0
 numpy==1.15.4
 packaging==18.0
 pluggy==0.8.0
-py==1.7.0
+py==1.10.0
 Pygments==2.3.0
 pyparsing==2.3.0
 pytest==4.0.1
