@@ -13,7 +13,7 @@ imagesize==1.1.0
 Jinja2==2.10
 MarkupSafe==1.1.0
 more-itertools==4.3.0
-numpy==1.15.4
+numpy==1.22.0
 packaging==18.0
 pluggy==0.8.0
 py==1.7.0
